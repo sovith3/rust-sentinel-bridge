@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 sovith3 - https://github.com/sovith3
+
+[package]
+name = "rust-sentinel-bridge"
+version = "1.0.0"
+edition = "2021"
+authors = ["sovith3"]
+license = "Apache-2.0"
+repository = "https://github.com/sovith3/rust-sentinel-bridge"
+description = "Universal zero-port bridge connecting HTTPS web apps to Windows security APIs, local AI (Ollama), hardware telemetry, and League of Legends LCU."
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
+native-tls = "0.2"
+futures-util = "0.3"
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "native-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+sha2 = "0.10"
+hex = "0.4"
+sysinfo = "0.31"
+winreg = "0.52"
+windows-sys = { version = "0.59", features = [
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Foundation",
+    "Win32_Security_WinTrust",
+    "Win32_Security_Cryptography"
+] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true

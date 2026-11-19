@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Rust Sentinel Bridge</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <img src="icons/icon48.png" alt="" width="28" height="28" />
+    <div>
+      <h1>Rust Sentinel Bridge</h1>
+      <p id="status">connecting…</p>
+    </div>
+  </header>
+
+  <div class="actions">
+    <button data-adapter="core" data-action="PING">Ping</button>
+    <button data-adapter="security_scanner" data-action="SCAN_DOWNLOADS_LATEST">Scan last download</button>
+    <button data-adapter="system_monitor" data-action="GET_SNAPSHOT">System snapshot</button>
+    <button data-adapter="lol_lcu" data-action="GET_STATUS">League client</button>
+    <button data-adapter="ollama_bridge" data-action="LIST_MODELS">Ollama models</button>
+  </div>
+
+  <pre id="log"></pre>
+
+  <footer>
+    <a href="https://github.com/sovith3/rust-sentinel-bridge" target="_blank" rel="noreferrer">source</a>
+    <span>Apache-2.0</span>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>

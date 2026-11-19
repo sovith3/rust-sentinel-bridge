@@ -1,0 +1,27 @@
+# Build output
+target/
+native-host/target/
+**/*.rs.bk
+*.pdb
+*.exe
+*.msi
+*.zip
+
+# Editor / OS noise
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Node tooling (the repo itself has no runtime dependency on Node)
+node_modules/
+package-lock.json
+npm-debug.log*
+
+# Local secrets and generated host manifests
+*.local.json
+com.rustsentinel.bridge.json
+extension_id.txt
+host.log
+bridge.log

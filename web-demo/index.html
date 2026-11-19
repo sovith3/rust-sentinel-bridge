@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rust Sentinel Bridge · Live Demo</title>
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #04070c;
+  --panel: rgba(12, 20, 31, 0.82);
+  --panel-solid: #0b131e;
+  --line: #1b2b3f;
+  --text: #d7e5f5;
+  --muted: #7089a3;
+  --accent: #38f2b0;
+  --accent-dim: rgba(56, 242, 176, 0.12);
+  --info: #4ea8ff;
+  --danger: #ff5c7a;
+  --warn: #ffc857;
+  --mono: "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  padding: 24px clamp(16px, 4vw, 56px) 56px;
+  background:
+    radial-gradient(900px 500px at 12% -8%, rgba(56, 242, 176, 0.10), transparent 60%),
+    radial-gradient(700px 420px at 92% 0%, rgba(78, 168, 255, 0.12), transparent 55%),
+    linear-gradient(180deg, #05090f 0%, var(--bg) 100%);
+  color: var(--text);
+  font: 14px/1.55 "Segoe UI", system-ui, -apple-system, sans-serif;
+  min-height: 100%;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(56, 242, 176, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 242, 176, 0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+  pointer-events: none;
+  mask-image: radial-gradient(circle at 50% 0%, #000 20%, transparent 78%);
+}
+
+header.top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+
+.brand { display: flex; gap: 14px; align-items: center; }
+
+.brand .sigil {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  border: 1px solid rgba(56, 242, 176, 0.45);
+  background: var(--accent-dim);
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  box-shadow: 0 0 28px rgba(56, 242, 176, 0.18);
+}
+
+h1 { margin: 0; font-size: 19px; letter-spacing: 0.02em; }
+.brand p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+
+.status-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(8, 14, 22, 0.75);
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+
+.dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--danger);
+  box-shadow: 0 0 10px currentColor;
+  color: var(--danger);
+}
+
+.dot.online { background: var(--accent); color: var(--accent); }
+.dot.waiting { background: var(--warn); color: var(--warn); }
+
+.status-bar span.sep { color: #24384f; }
+
+nav.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+nav.tabs button {
+  padding: 9px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(10, 18, 28, 0.7);
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+nav.tabs button:hover { color: var(--text); border-color: #2a4763; }
+
+nav.tabs button[aria-selected="true"] {
+  color: #04120c;
+  background: linear-gradient(180deg, #4ff8bd, #24d295);
+  border-color: transparent;
+  box-shadow: 0 6px 24px rgba(56, 242, 176, 0.25);
+}
+
+main { position: relative; z-index: 1; }
+
+section.panel { display: none; animation: fade 180ms ease-out; }
+section.panel.active { display: block; }
+
+@keyframes fade {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.grid { display: grid; gap: 16px; }
+.grid.two { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+.grid.three { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+
+.card {
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  backdrop-filter: blur(6px);
+}
+
+.card h2 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.metric { font-family: var(--mono); font-size: 26px; color: var(--accent); }
+.metric small { font-size: 12px; color: var(--muted); }
+
+label { display: block; font-size: 11.5px; color: var(--muted); margin-bottom: 4px; }
+
+input, textarea, select {
+  width: 100%;
+  padding: 9px 11px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #070d15;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+
+textarea { resize: vertical; min-height: 92px; font-family: var(--mono); font-size: 12.5px; }
+
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.row > .grow { flex: 1 1 220px; }
+
+button.act {
+  padding: 9px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(56, 242, 176, 0.4);
+  background: var(--accent-dim);
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  font-size: 12.5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 140ms ease;
+}
+
+button.act:hover { background: rgba(56, 242, 176, 0.22); }
+button.act:disabled { opacity: 0.45; cursor: not-allowed; }
+button.act.ghost { border-color: var(--line); background: transparent; color: var(--muted); }
+button.act.danger { border-color: rgba(255, 92, 122, 0.4); background: rgba(255, 92, 122, 0.1); color: var(--danger); }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 11px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.badge.safe { border-color: rgba(56, 242, 176, 0.5); color: var(--accent); background: rgba(56, 242, 176, 0.08); }
+.badge.warn { border-color: rgba(255, 200, 87, 0.5); color: var(--warn); background: rgba(255, 200, 87, 0.08); }
+.badge.danger { border-color: rgba(255, 92, 122, 0.5); color: var(--danger); background: rgba(255, 92, 122, 0.08); }
+
+pre.out {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #050a10;
+  color: #a7eccd;
+  font: 11.5px/1.5 var(--mono);
+  max-height: 340px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.kv { display: grid; grid-template-columns: 130px 1fr; gap: 4px 12px; font-size: 12.5px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; font-family: var(--mono); word-break: break-all; }
+
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th { text-align: left; color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+th, td { padding: 6px 8px; border-bottom: 1px solid rgba(27, 43, 63, 0.7); }
+td.num { text-align: right; font-family: var(--mono); }
+
+.bar { height: 7px; border-radius: 999px; background: #101c29; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: linear-gradient(90deg, #24d295, #4ea8ff); transition: width 280ms ease; }
+
+canvas#cpuChart { width: 100%; height: 110px; display: block; }
+
+ul.findings { margin: 0; padding-left: 18px; font-size: 12.5px; }
+ul.findings li { margin-bottom: 3px; }
+
+.hint { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+
+footer.page {
+  margin-top: 28px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11.5px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+footer.page a { color: var(--muted); }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <div class="sigil">🛡</div>
+    <div>
+      <h1>Rust Sentinel Bridge</h1>
+      <p>Native messaging · zero open ports · Rust 2021 · Apache-2.0</p>
+    </div>
+  </div>
+  <div class="status-bar">
+    <i class="dot waiting" id="statusDot"></i>
+    <span id="statusText">waiting for extension…</span>
+    <span class="sep">|</span>
+    <span id="latencyText">-- ms</span>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" aria-selected="true" data-panel="security">Security Scanner</button>
+  <button role="tab" aria-selected="false" data-panel="ollama">Local AI</button>
+  <button role="tab" aria-selected="false" data-panel="telemetry">Telemetry</button>
+  <button role="tab" aria-selected="false" data-panel="lcu">League LCU</button>
+</nav>
+
+<main>
+  <section class="panel active" id="panel-security">
+    <div class="grid two">
+      <div class="card">
+        <h2>Scan a file</h2>
+        <div class="row">
+          <div class="grow">
+            <label for="scanPath">Absolute Windows path</label>
+            <input id="scanPath" type="text" placeholder="C:\Users\me\Downloads\installer.exe" spellcheck="false" />
+          </div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button class="act" id="scanPathBtn">Scan file</button>
+          <button class="act ghost" id="scanDownloadBtn">Scan latest download</button>
+        </div>
+        <p class="hint">SHA-256, Shannon entropy, Authenticode (WinVerifyTrust) and suspicious-API heuristics run locally, no upload.</p>
+      </div>
+
+      <div class="card">
+        <h2>Verdict</h2>
+        <div id="verdict"><span class="badge">no scan yet</span></div>
+        <div class="bar" style="margin:12px 0 10px"><i id="riskBar" style="width:0%"></i></div>
+        <dl class="kv" id="verdictFacts">
+          <dt>File</dt><dd id="factName">—</dd>
+          <dt>SHA-256</dt><dd id="factHash">—</dd>
+          <dt>Entropy</dt><dd id="factEntropy">—</dd>
+          <dt>Signature</dt><dd id="factSignature">—</dd>
+          <dt>Size</dt><dd id="factSize">—</dd>
+          <dt>Duration</dt><dd id="factDuration">—</dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="grid two" style="margin-top:16px">
+      <div class="card">
+        <h2>Findings</h2>
+        <ul class="findings" id="findings"><li class="hint">Run a scan to see heuristic results.</li></ul>
+      </div>
+      <div class="card">
+        <h2>Raw payload</h2>
+        <pre class="out" id="scanRaw">// waiting for a scan…</pre>
+      </div>
+    </div>
+  </section>
+  <section class="panel" id="panel-ollama">
+    <div class="grid two">
+      <div class="card">
+        <h2>Local model</h2>
+        <div class="row">
+          <div class="grow">
+            <label for="ollamaEndpoint">Loopback endpoint</label>
+            <input id="ollamaEndpoint" type="text" value="http://127.0.0.1:11434" spellcheck="false" />
+          </div>
+          <button class="act ghost" id="ollamaRefresh">List models</button>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <div class="grow">
+            <label for="ollamaModel">Model</label>
+            <select id="ollamaModel"><option value="">— list models first —</option></select>
+          </div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <div class="grow">
+            <label for="ollamaSystem">System prompt (optional)</label>
+            <input id="ollamaSystem" type="text" value="You are a concise Rust security assistant." />
+          </div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <div class="grow">
+            <label for="ollamaPrompt">Prompt</label>
+            <textarea id="ollamaPrompt" spellcheck="false">Explain in 3 bullets why native messaging beats a localhost HTTP bridge for browser-to-desktop IPC.</textarea>
+          </div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button class="act" id="ollamaSend">Stream answer</button>
+          <span class="badge" id="ollamaStats">idle</span>
+        </div>
+        <p class="hint">Only <code>127.0.0.1</code>, <code>localhost</code> and <code>[::1]</code> are accepted — the adapter refuses to become an open proxy.</p>
+      </div>
+
+      <div class="card">
+        <h2>Stream</h2>
+        <pre class="out" id="ollamaOut">// no completion yet…</pre>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-telemetry">
+    <div class="row" style="margin-bottom:16px">
+      <button class="act" id="teleSnapshot">Snapshot</button>
+      <button class="act" id="teleStart">Start stream</button>
+      <button class="act danger" id="teleStop">Stop</button>
+      <span class="badge" id="teleState">idle</span>
+    </div>
+
+    <div class="grid three">
+      <div class="card">
+        <h2>CPU</h2>
+        <div class="metric"><span id="cpuValue">—</span><small> %</small></div>
+        <div class="bar" style="margin-top:10px"><i id="cpuBar" style="width:0%"></i></div>
+        <canvas id="cpuChart" style="margin-top:12px"></canvas>
+      </div>
+      <div class="card">
+        <h2>Memory</h2>
+        <div class="metric"><span id="memValue">—</span><small> %</small></div>
+        <div class="bar" style="margin-top:10px"><i id="memBar" style="width:0%"></i></div>
+        <dl class="kv" style="margin-top:12px">
+          <dt>Used</dt><dd id="memUsed">—</dd>
+          <dt>Total</dt><dd id="memTotal">—</dd>
+          <dt>Swap</dt><dd id="memSwap">—</dd>
+        </dl>
+      </div>
+      <div class="card">
+        <h2>Host</h2>
+        <dl class="kv">
+          <dt>Name</dt><dd id="hostName">—</dd>
+          <dt>OS</dt><dd id="hostOs">—</dd>
+          <dt>CPU</dt><dd id="hostCpu">—</dd>
+          <dt>Cores</dt><dd id="hostCores">—</dd>
+          <dt>Uptime</dt><dd id="hostUptime">—</dd>
+          <dt>Processes</dt><dd id="hostProcs">—</dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="grid two" style="margin-top:16px">
+      <div class="card">
+        <h2>Top processes</h2>
+        <table>
+          <thead><tr><th>PID</th><th>Name</th><th>CPU</th><th>RAM</th></tr></thead>
+          <tbody id="processRows"><tr><td colspan="4" class="hint">no sample yet</td></tr></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h2>Disks</h2>
+        <table>
+          <thead><tr><th>Mount</th><th>FS</th><th>Used</th><th>Free</th></tr></thead>
+          <tbody id="diskRows"><tr><td colspan="4" class="hint">no sample yet</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-lcu">
+    <div class="row" style="margin-bottom:16px">
+      <button class="act" id="lcuStatus">Read client status</button>
+      <button class="act ghost" id="lcuChampSelect">Champion select</button>
+      <button class="act" id="lcuSubscribe">Subscribe to events</button>
+      <button class="act danger" id="lcuUnsubscribe">Stop</button>
+    </div>
+
+    <div class="grid two">
+      <div class="card">
+        <h2>Summoner</h2>
+        <dl class="kv">
+          <dt>Riot ID</dt><dd id="lcuName">—</dd>
+          <dt>Level</dt><dd id="lcuLevel">—</dd>
+          <dt>Phase</dt><dd id="lcuPhase">—</dd>
+          <dt>Port</dt><dd id="lcuPort">—</dd>
+          <dt>Lockfile</dt><dd id="lcuLockfile">—</dd>
+          <dt>PID</dt><dd id="lcuPid">—</dd>
+        </dl>
+        <p class="hint">Credentials are read from the Riot Client <code>lockfile</code> and never leave the host process.</p>
+      </div>
+      <div class="card">
+        <h2>Event log</h2>
+        <pre class="out" id="lcuLog">// idle…</pre>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="page">
+  <span>Native Messaging host · <code>com.rustsentinel.bridge</code></span>
+  <span>Running in demo mode until the extension injects the content script. <a href="../README.md">README</a></span>
+</footer>
+
+<script>
+(() => {
+  "use strict";
+
+  const CHANNEL = "rust-sentinel-bridge";
+  const pending = new Map();
+  const $ = (id) => document.getElementById(id);
+
+  function fmtBytes(bytes) {
+    const value = Number(bytes);
+    if (!Number.isFinite(value) || value <= 0) {
+      return "0 B";
+    }
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    const power = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1);
+    return `${(value / 1024 ** power).toFixed(power === 0 ? 0 : 1)} ${units[power]}`;
+  }
+
+  function fmtDuration(seconds) {
+    const total = Math.max(0, Math.floor(Number(seconds) || 0));
+    const days = Math.floor(total / 86400);
+    const hours = Math.floor((total % 86400) / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    return days > 0 ? `${days}d ${hours}h` : `${hours}h ${minutes}m`;
+  }
+
+  function setConnection(online, label) {
+    const dot = $("statusDot");
+    dot.className = `dot ${online ? "online" : "waiting"}`;
+    $("statusText").textContent = label;
+  }
+
+  function setLatency(ms) {
+    $("latencyText").textContent = `${Math.max(1, Math.round(ms))} ms`;
+  }
+
+  function recordLatency(startedAt) {
+    if (typeof startedAt === "number") {
+      setLatency(performance.now() - startedAt);
+    }
+  }
+
+  function request(adapter, action, payload = {}, handlers = {}) {
+    const id = crypto.randomUUID();
+    pending.set(id, { ...handlers, startedAt: performance.now() });
+    window.postMessage(
+      { channel: CHANNEL, direction: "to-extension", message: { id, adapter, action, payload } },
+      "*"
+    );
+    return id;
+  }
+
+  function dispatch(frame) {
+    const entry = pending.get(frame.id);
+
+    if (!entry) {
+      if (frame.event === "STREAM" && streamSinks.has(frame.adapter)) {
+        streamSinks.get(frame.adapter)(frame.data || {});
+        return;
+      }
+      if (frame.event === "STATUS" && frame.data && frame.data.connected !== undefined) {
+        setConnection(Boolean(frame.data.connected), frame.data.message || "bridge");
+      }
+      return;
+    }
+
+    switch (frame.event) {
+      case "STATUS":
+        if (entry.onStatus) {
+          entry.onStatus(frame.data || {});
+        }
+        break;
+      case "STREAM":
+        if (entry.onStream) {
+          entry.onStream(frame.data || {});
+        }
+        break;
+      case "RESULT":
+        pending.delete(frame.id);
+        recordLatency(entry.startedAt);
+        if (entry.onResult) {
+          entry.onResult(frame.data || {});
+        }
+        break;
+      case "ERROR":
+        pending.delete(frame.id);
+        if (entry.onError) {
+          entry.onError(frame.data || {});
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  window.addEventListener("message", (event) => {
+    if (event.source !== window) {
+      return;
+    }
+    const message = event.data;
+    if (!message || message.channel !== CHANNEL || message.direction !== "to-page") {
+      return;
+    }
+    if (message.frame) {
+      dispatch(message.frame);
+    }
+  });
+
+  function ping(quiet) {
+    const startedAt = performance.now();
+    request(
+      "core",
+      "PING",
+      { from: "web-demo" },
+      {
+        onResult(data) {
+          setLatency(performance.now() - startedAt);
+          setConnection(true, "bridge online");
+          if (!quiet) {
+            console.info("[bridge] ping", data);
+          }
+        },
+        onError(error) {
+          setConnection(false, error.code || "bridge error");
+        }
+      }
+    );
+  }
+
+  for (const tab of document.querySelectorAll("nav.tabs [data-panel]")) {
+    tab.addEventListener("click", () => {
+      for (const other of document.querySelectorAll("nav.tabs [data-panel]")) {
+        other.setAttribute("aria-selected", String(other === tab));
+      }
+      for (const panel of document.querySelectorAll("section.panel")) {
+        panel.classList.toggle("active", panel.id === `panel-${tab.dataset.panel}`);
+      }
+    });
+  }
+
+  function stdout(element, text) {
+    element.textContent = text;
+    element.scrollTop = element.scrollHeight;
+  }
+
+  const RISK_CLASS = { SAFE: "safe", UNSIGNED_WARNING: "warn", HIGH_RISK: "danger" };
+
+  function renderScan(report) {
+    const risk = report.riskLevel || "SAFE";
+    const badgeClass = RISK_CLASS[risk] || "";
+    $("verdict").innerHTML = "";
+
+    const badge = document.createElement("span");
+    badge.className = `badge ${badgeClass}`;
+    badge.textContent = `${risk} · ${report.riskScore ?? 0}/100`;
+    $("verdict").appendChild(badge);
+
+    $("riskBar").style.width = `${Math.min(100, Number(report.riskScore) || 0)}%`;
+    $("factName").textContent = report.fileName || report.path || "—";
+    $("factHash").textContent = report.sha256 || "—";
+    $("factEntropy").textContent =
+      report.entropy === undefined ? "—" : `${report.entropy} bits/byte`;
+    $("factSignature").textContent = report.signature
+      ? `${report.signature.status} (${report.signature.winVerifyTrustCode})`
+      : "—";
+    $("factSize").textContent =
+      report.sizeBytes === undefined
+        ? "—"
+        : `${fmtBytes(report.sizeBytes)} · .${report.extension || "?"}${report.isPortableExecutable ? " · PE" : ""}`;
+    $("factDuration").textContent =
+      report.durationMs === undefined ? "—" : `${report.durationMs} ms`;
+
+    const findings = $("findings");
+    findings.innerHTML = "";
+    const items = Array.isArray(report.findings) ? report.findings.slice() : [];
+    if (report.recommendation) {
+      items.push(`Recommendation: ${report.recommendation}`);
+    }
+    for (const line of items) {
+      const li = document.createElement("li");
+      li.textContent = line;
+      findings.appendChild(li);
+    }
+    if (items.length === 0) {
+      findings.innerHTML = "<li class=\"hint\">No findings reported.</li>";
+    }
+
+    stdout($("scanRaw"), JSON.stringify(report, null, 2));
+  }
+
+  function scanFailure(error) {
+    $("verdict").innerHTML = `<span class="badge danger">${error.code || "ERROR"}</span>`;
+    $("riskBar").style.width = "0%";
+    stdout($("scanRaw"), `${error.code || "ERROR"}: ${error.message || "unknown failure"}`);
+  }
+
+  $("scanPathBtn").addEventListener("click", () => {
+    const path = $("scanPath").value.trim();
+    if (!path) {
+      stdout($("scanRaw"), "Provide an absolute path, for example C:\\Users\\me\\Downloads\\setup.exe");
+      return;
+    }
+    stdout($("scanRaw"), `scanning ${path} …`);
+    request(
+      "security_scanner",
+      "SCAN_FILE",
+      { path },
+      {
+        onStatus: (data) =>
+          stdout(
+            $("scanRaw"),
+            `$ ${data.message || "working"}\n${JSON.stringify(
+              Object.fromEntries(Object.entries(data).filter(([key]) => key !== "message")),
+              null,
+              2
+            )}`
+          ),
+        onResult: renderScan,
+        onError: scanFailure
+      }
+    );
+  });
+
+  $("scanDownloadBtn").addEventListener("click", () => {
+    stdout($("scanRaw"), "locating the newest file in Downloads …");
+    request("security_scanner", "SCAN_DOWNLOADS_LATEST", {}, {
+      onStatus: (data) => stdout($("scanRaw"), `$ ${data.message || "working"}`),
+      onResult: renderScan,
+      onError: scanFailure
+    });
+  });
+
+  const streamSinks = new Map();
+
+  // ---------------------------------------------------------------- Ollama --
+
+  let completion = "";
+
+  $("ollamaRefresh").addEventListener("click", () => {
+    const endpoint = $("ollamaEndpoint").value.trim();
+    stdout($("ollamaOut"), `GET ${endpoint}/api/tags …`);
+    request(
+      "ollama_bridge",
+      "LIST_MODELS",
+      { endpoint },
+      {
+        onResult(data) {
+          const select = $("ollamaModel");
+          select.innerHTML = "";
+          const models = Array.isArray(data.models) ? data.models : [];
+          if (models.length === 0) {
+            const option = document.createElement("option");
+            option.value = "";
+            option.textContent = "— no models pulled —";
+            select.appendChild(option);
+          }
+          for (const model of models) {
+            const option = document.createElement("option");
+            option.value = model.name;
+            option.textContent = `${model.name} · ${model.parameterSize || "?"} · ${model.quantization || "?"}`;
+            select.appendChild(option);
+          }
+          stdout(
+            $("ollamaOut"),
+            `reachable: ${data.reachable}\nmodels: ${data.count}\n\n${JSON.stringify(models, null, 2)}`
+          );
+          $("ollamaStats").textContent = `${data.count} model(s)`;
+        },
+        onError(error) {
+          stdout($("ollamaOut"), `${error.code}: ${error.message}`);
+          $("ollamaStats").textContent = "error";
+        }
+      }
+    );
+  });
+
+  $("ollamaSend").addEventListener("click", () => {
+    const model = $("ollamaModel").value;
+    const prompt = $("ollamaPrompt").value.trim();
+    if (!model) {
+      stdout($("ollamaOut"), "Pick a model first (List models).");
+      return;
+    }
+    if (!prompt) {
+      stdout($("ollamaOut"), "Write a prompt first.");
+      return;
+    }
+
+    completion = "";
+    const startedAt = performance.now();
+    let chunks = 0;
+    stdout($("ollamaOut"), "");
+    $("ollamaStats").textContent = "streaming…";
+
+    request(
+      "ollama_bridge",
+      "CHAT_STREAM",
+      {
+        endpoint: $("ollamaEndpoint").value.trim(),
+        model,
+        prompt,
+        system: $("ollamaSystem").value.trim() || undefined
+      },
+      {
+        onStream(data) {
+          chunks += 1;
+          completion += data.content || "";
+          stdout($("ollamaOut"), completion);
+          $("ollamaStats").textContent = `${chunks} chunk(s) · ${Math.round(performance.now() - startedAt)} ms`;
+        },
+        onResult(data) {
+          completion = data.content || completion;
+          stdout($("ollamaOut"), completion || "(empty answer)");
+          const tokens = data.evalCount ? ` · ${data.evalCount} tokens` : "";
+          $("ollamaStats").textContent = `done · ${chunks} chunk(s)${tokens} · ${Math.round(performance.now() - startedAt)} ms`;
+        },
+        onError(error) {
+          stdout($("ollamaOut"), `${error.code}: ${error.message}`);
+          $("ollamaStats").textContent = "error";
+        }
+      }
+    );
+  });
+
+  // ------------------------------------------------------------- Telemetry --
+
+  const cpuHistory = [];
+
+  function drawCpuChart() {
+    const canvas = $("cpuChart");
+    const ratio = window.devicePixelRatio || 1;
+    const width = canvas.clientWidth || 240;
+    const height = canvas.clientHeight || 110;
+    if (canvas.width !== Math.floor(width * ratio) || canvas.height !== Math.floor(height * ratio)) {
+      canvas.width = Math.floor(width * ratio);
+      canvas.height = Math.floor(height * ratio);
+    }
+
+    const context = canvas.getContext("2d");
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.clearRect(0, 0, width, height);
+
+    context.strokeStyle = "rgba(78, 168, 255, 0.18)";
+    context.lineWidth = 1;
+    for (let line = 1; line < 4; line += 1) {
+      const y = (height / 4) * line;
+      context.beginPath();
+      context.moveTo(0, y);
+      context.lineTo(width, y);
+      context.stroke();
+    }
+
+    if (cpuHistory.length < 2) {
+      return;
+    }
+
+    const step = width / Math.max(1, cpuHistory.length - 1);
+    context.beginPath();
+    cpuHistory.forEach((value, index) => {
+      const x = index * step;
+      const y = height - (Math.min(100, Math.max(0, value)) / 100) * height;
+      if (index === 0) {
+        context.moveTo(x, y);
+      } else {
+        context.lineTo(x, y);
+      }
+    });
+    context.strokeStyle = "#38f2b0";
+    context.lineWidth = 2;
+    context.stroke();
+
+    context.lineTo(width, height);
+    context.lineTo(0, height);
+    context.closePath();
+    const gradient = context.createLinearGradient(0, 0, 0, height);
+    gradient.addColorStop(0, "rgba(56, 242, 176, 0.35)");
+    gradient.addColorStop(1, "rgba(56, 242, 176, 0.02)");
+    context.fillStyle = gradient;
+    context.fill();
+  }
+
+  function renderSnapshot(snapshot) {
+    const cpu = snapshot.cpu || {};
+    const memory = snapshot.memory || {};
+    const host = snapshot.host || {};
+
+    $("cpuValue").textContent = cpu.usagePercent ?? "—";
+    $("cpuBar").style.width = `${Math.min(100, Number(cpu.usagePercent) || 0)}%`;
+    cpuHistory.push(Number(cpu.usagePercent) || 0);
+    while (cpuHistory.length > 60) {
+      cpuHistory.shift();
+    }
+    drawCpuChart();
+
+    $("memValue").textContent = memory.usagePercent ?? "—";
+    $("memBar").style.width = `${Math.min(100, Number(memory.usagePercent) || 0)}%`;
+    $("memUsed").textContent = fmtBytes(memory.usedBytes);
+    $("memTotal").textContent = fmtBytes(memory.totalBytes);
+    $("memSwap").textContent = `${fmtBytes(memory.swapUsedBytes)} / ${fmtBytes(memory.swapTotalBytes)}`;
+
+    $("hostName").textContent = host.name || "—";
+    $("hostOs").textContent = `${host.osName || "?"} ${host.osVersion || ""}`.trim();
+    $("hostCpu").textContent = host.cpuBrand || "—";
+    $("hostCores").textContent = `${host.physicalCores || 0} physical / ${host.logicalCores || 0} logical`;
+    $("hostUptime").textContent = fmtDuration(snapshot.uptimeSeconds);
+    $("hostProcs").textContent = snapshot.processCount ?? "—";
+
+    const processRows = $("processRows");
+    processRows.innerHTML = "";
+    for (const process of snapshot.topCpuProcesses || []) {
+      const row = document.createElement("tr");
+      row.innerHTML = `<td class="num">${process.pid}</td><td>${process.name}</td><td class="num">${process.cpuPercent}%</td><td class="num">${fmtBytes(process.memoryBytes)}</td>`;
+      processRows.appendChild(row);
+    }
+    if (!processRows.children.length) {
+      processRows.innerHTML = '<tr><td colspan="4" class="hint">process list not requested</td></tr>';
+    }
+
+    const diskRows = $("diskRows");
+    diskRows.innerHTML = "";
+    for (const disk of snapshot.disks || []) {
+      const row = document.createElement("tr");
+      row.innerHTML = `<td>${disk.mountPoint}</td><td>${disk.fileSystem}</td><td class="num">${fmtBytes(disk.usedBytes)} (${disk.usagePercent}%)</td><td class="num">${fmtBytes(disk.availableBytes)}</td>`;
+      diskRows.appendChild(row);
+    }
+    if (!diskRows.children.length) {
+      diskRows.innerHTML = '<tr><td colspan="4" class="hint">no disks reported</td></tr>';
+    }
+  }
+
+  function telemetryError(error) {
+    $("teleState").textContent = error.code || "error";
+    $("teleState").className = "badge danger";
+  }
+
+  $("teleSnapshot").addEventListener("click", () => {
+    $("teleState").textContent = "sampling…";
+    $("teleState").className = "badge";
+    request("system_monitor", "GET_SNAPSHOT", {}, {
+      onResult(data) {
+        renderSnapshot(data);
+        $("teleState").textContent = "snapshot";
+        $("teleState").className = "badge safe";
+      },
+      onError: telemetryError
+    });
+  });
+
+  $("teleStart").addEventListener("click", () => {
+    $("teleState").textContent = "streaming";
+    $("teleState").className = "badge safe";
+    streamSinks.set("system_monitor", renderSnapshot);
+    request("system_monitor", "START_TELEMETRY", { intervalMs: 1000 }, { onError: telemetryError });
+  });
+
+  $("teleStop").addEventListener("click", () => {
+    streamSinks.delete("system_monitor");
+    request("system_monitor", "STOP_TELEMETRY", {}, {
+      onResult() {
+        $("teleState").textContent = "idle";
+        $("teleState").className = "badge";
+      },
+      onError: telemetryError
+    });
+  });
+
+  // ------------------------------------------------------------------- LCU --
+
+  function lcuLog(line) {
+    const element = $("lcuLog");
+    const stamp = new Date().toLocaleTimeString();
+    stdout(element, `${element.textContent === "// idle…" ? "" : `${element.textContent}\n`}[${stamp}] ${line}`);
+  }
+
+  function lcuError(error) {
+    lcuLog(`${error.code || "ERROR"}: ${error.message || ""}`);
+  }
+
+  $("lcuStatus").addEventListener("click", () => {
+    lcuLog("reading lockfile + summoner …");
+    request("lol_lcu", "GET_STATUS", {}, {
+      onResult(data) {
+        const summoner = data.summoner || {};
+        const riotId = [summoner.gameName, summoner.tagLine].filter(Boolean).join("#");
+        $("lcuName").textContent = summoner.displayName || riotId || "—";
+        $("lcuLevel").textContent = summoner.summonerLevel ?? "—";
+        $("lcuPhase").textContent = data.gameflowPhase ?? "—";
+        $("lcuPort").textContent = data.port ?? "—";
+        $("lcuLockfile").textContent = data.lockfile ?? "—";
+        $("lcuPid").textContent = data.processId ?? "—";
+        lcuLog(`connected on ${data.baseUrl || "?"} · phase ${data.gameflowPhase}`);
+      },
+      onError: lcuError
+    });
+  });
+
+  $("lcuChampSelect").addEventListener("click", () => {
+    request("lol_lcu", "GET_CHAMP_SELECT", {}, {
+      onResult(data) {
+        lcuLog(data.inChampSelect ? `champion select: ${JSON.stringify(data.session).slice(0, 400)}` : data.reason || "not in champion select");
+      },
+      onError: lcuError
+    });
+  });
+
+  $("lcuSubscribe").addEventListener("click", () => {
+    streamSinks.set("lol_lcu", (event) => {
+      const payload = event.payload === undefined ? "" : ` ${JSON.stringify(event.payload).slice(0, 500)}`;
+      lcuLog(`#${event.sequence} ${event.event}${payload}`);
+    });
+    request("lol_lcu", "SUBSCRIBE_CHAMP_SELECT", {}, {
+      onStatus: (data) => lcuLog(data.message || "subscribing"),
+      onResult(data) {
+        if (data.streaming) {
+          lcuLog(`subscribed to ${data.event} (retry ${data.reconnectDelayMs} ms)`);
+        }
+      },
+      onError: lcuError
+    });
+  });
+
+  $("lcuUnsubscribe").addEventListener("click", () => {
+    streamSinks.delete("lol_lcu");
+    request("lol_lcu", "STOP_SUBSCRIPTION", {}, {
+      onResult: () => lcuLog("subscription stopped"),
+      onError: lcuError
+    });
+  });
+
+  // -------------------------------------------------------------- bootstrap --
+
+  window.addEventListener("resize", drawCpuChart);
+
+  ping(false);
+  setInterval(() => ping(true), 5000);
+
+  if (!window.chrome || !window.chrome.runtime || !window.chrome.runtime.id) {
+    setConnection(false, "extension not detected");
+  }
+})();
+</script>
+
+
+</body>
+</html>

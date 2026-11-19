@@ -1,0 +1,40 @@
+Rust Sentinel Bridge
+Copyright 2026 sovith3
+
+This product includes software developed by third parties. The following
+components are linked into, or redistributed with, the native host binary.
+Their licenses apply to those components; the project's own source code is
+licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Rust standard library and crates
+--------------------------------
+tokio              MIT                       https://github.com/tokio-rs/tokio
+tokio-tungstenite  MIT                       https://github.com/snapview/tokio-tungstenite
+tungstenite        MIT / Apache-2.0          https://github.com/snapview/tungstenite-rs
+native-tls         MIT / Apache-2.0          https://github.com/sfackler/rust-native-tls
+schannel           MIT                       https://github.com/steffengy/schannel-rs
+futures-util       MIT / Apache-2.0          https://github.com/rust-lang/futures-rs
+reqwest            MIT / Apache-2.0          https://github.com/seanmonstar/reqwest
+hyper              MIT                       https://github.com/hyperium/hyper
+serde, serde_json  MIT / Apache-2.0          https://github.com/serde-rs/serde
+base64             MIT / Apache-2.0          https://github.com/marshallpierce/rust-base64
+sha2               MIT / Apache-2.0          https://github.com/RustCrypto/hashes
+hex                MIT / Apache-2.0          https://github.com/KokaKiwi/rust-hex
+sysinfo            MIT                       https://github.com/GuillaumeGomez/sysinfo
+winreg             MIT                       https://github.com/gentoo90/winreg-rs
+windows-sys        MIT / Apache-2.0          https://github.com/microsoft/windows-rs
+
+A complete dependency graph with resolved versions is pinned in
+native-host/Cargo.lock. Run `cargo deny check licenses` (or `cargo about`) to
+regenerate a full machine-readable attribution list before redistributing a
+modified build.
+
+Trademarks and product names
+----------------------------
+Google Chrome, Microsoft Edge, Chromium, Windows, Ollama, League of Legends and
+Riot Client are trademarks of their respective owners. They are referenced here
+only to describe interoperability. This project is independent and is not
+affiliated with, endorsed by, or sponsored by any of them.
+
+Icons in extension/icons/ were generated for this project and are distributed
+under the same Apache-2.0 terms as the rest of the repository.

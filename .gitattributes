@@ -1,0 +1,6 @@
+# Normalise line endings so the repo is byte-identical on Windows, Linux and CI.
+* text=auto eol=lf
+
+# Keep generated/binary assets untouched.
+*.png binary
+*.exe binary

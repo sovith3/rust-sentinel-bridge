@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 sovith3 - https://github.com/sovith3
+
+# Statically link the C runtime so the shipped .exe runs on a freshly
+# formatted Windows 10/11 machine without any redistributable installed.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+# Fallback toolchain for machines without the MSVC linker installed.
+# Build with: cargo build --release --target x86_64-pc-windows-gnu
+[target.x86_64-pc-windows-gnu]
+linker = "x86_64-w64-mingw32-gcc"
+rustflags = ["-C", "target-feature=+crt-static"]
