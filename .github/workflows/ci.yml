@@ -97,4 +97,68 @@ jobs:
 
       - name: Validate demo HTML is self-contained
         run: |
-          node -e "const s=require('fs').readFileSync('web-demo/index.html','utf8'); if(!s.includes('rust-sentinel-bridge')) throw new Error('demo lost its bridge channel'); console.log('web-demo ok')"
+          node - <<'NODE'
+          const fs = require("fs");
+          const html = fs.readFileSync("web-demo/index.html", "utf8");
+          if (!html.includes("rust-sentinel-bridge")) {
+            throw new Error("demo lost its bridge channel");
+          }
+          if (!html.includes("Bridge Connected") || !html.includes("Extension Not Detected")) {
+            throw new Error("demo lost its connection states");
+          }
+          console.log("web-demo ok");
+          NODE
+
+      - name: Syntax-check the demo inline script
+        run: |
+          node - <<'NODE'
+          const fs = require("fs");
+          const html = fs.readFileSync("web-demo/index.html", "utf8");
+          const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+          if (blocks.length === 0) {
+            throw new Error("no inline script found in web-demo/index.html");
+          }
+          for (const code of blocks) {
+            new Function(code);
+          }
+          console.log(`web-demo script ok (${blocks.length} block)`);
+          NODE
+
+      - name: Verify the demo has no external assets
+        run: |
+          node - <<'NODE'
+          const fs = require("fs");
+          const html = fs.readFileSync("web-demo/index.html", "utf8");
+          const external = [...html.matchAll(/(?:src|srcset|href)="([^"]+)"/g)]
+            .map((match) => match[1])
+            .filter((url) => /^(https?:)?\/\//.test(url))
+            .filter((url) => !url.includes("github.com"));
+          if (external.length > 0) {
+            throw new Error(`external assets would break GitHub Pages: ${external.join(", ")}`);
+          }
+          console.log("web-demo is self-contained");
+          NODE
+
+  scripts:
+    name: Installer script
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse install.ps1
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD "install.ps1"), [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Host "::error::$($_.Message)" }
+            exit 1
+          }
+          Write-Host "install.ps1 parses cleanly"
+
+      - name: Show installer help
+        shell: pwsh
+        run: ./install.ps1 -? | Out-String | Write-Host
+

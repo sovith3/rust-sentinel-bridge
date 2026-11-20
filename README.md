@@ -1,14 +1,26 @@
 # Rust Sentinel Bridge
 
 [![CI](https://github.com/sovith3/rust-sentinel-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/sovith3/rust-sentinel-bridge/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/sovith3/rust-sentinel-bridge?color=38f2b0)](https://github.com/sovith3/rust-sentinel-bridge/releases/latest)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-2021-orange.svg)](native-host/Cargo.toml)
+[![Chrome](https://img.shields.io/badge/Chrome%20%7C%20Edge-MV3-4285f4.svg)](#requirements)
 
-A zero-port bridge between **any HTTPS web page** and native Windows capabilities.
+**Connect any HTTPS page to local Ollama, Windows telemetry, file scanning or the League
+client — without opening a TCP port, without a local server, and without CORS errors.**
 
-No localhost HTTP server. No open TCP port. No CORS workaround. The browser talks to a
-Rust binary over **Chrome/Edge Native Messaging**: stdin/stdout framed with a 4-byte
-length prefix, spawned by the browser itself and locked to a single extension ID.
+<!-- Replace docs/demo.gif with a 15-20 s screen recording of the live demo (keep it under ~5 MB). -->
+![Rust Sentinel Bridge live demo](docs/demo.gif)
+
+**[Live demo](https://sovith3.github.io/rust-sentinel-bridge/)** ·
+**[Download latest release](https://github.com/sovith3/rust-sentinel-bridge/releases/latest)** ·
+**[Wire protocol](docs/PROTOCOL.md)** ·
+**[Español](README.es.md)**
+
+`rust-sentinel-bridge.exe` is a 1.5 MB Rust binary that Chrome or Edge spawns through
+**Native Messaging**: stdin/stdout framed with a 4-byte length prefix. The pipe only exists
+while the browser holds it, it is pinned to one extension id, and nothing listens on the
+network — so a web page can reach native Windows APIs that `fetch()` can never touch.
 
 ```
 ┌──────────────┐  postMessage   ┌──────────────┐  port   ┌────────────────┐
@@ -24,6 +36,85 @@ length prefix, spawned by the browser itself and locked to a single extension ID
                                               └──────────────────────────────┘
 ```
 
+## Why not a localhost server?
+
+The usual way to reach native code from a web page is `http://127.0.0.1:PORT`. It works,
+but you pay for it in security and plumbing:
+
+| | Localhost HTTP server | Rust Sentinel Bridge |
+| --- | --- | --- |
+| Network surface | A TCP port any local process can scan and call | **No socket at all** — stdin/stdout owned by the browser |
+| CORS / preflight | Needs permissive headers, a proxy, or `no-cors` hacks | **Not applicable**: no HTTP request leaves the page |
+| HTTPS pages | Mixed-content rules block `http://` calls | **Allowed**: native messaging is not network traffic |
+| Who can call it | Any page or app that guesses the port | **Only the pinned extension id** (`allowed_origins`) |
+| Idle cost | A daemon, a listening port, logs, an auto-start entry | **0% CPU / 0 MB** — spawned on demand, dies with the pipe |
+| Distribution | Users install and trust a server | One `.exe` + one unpacked extension, no admin rights |
+
+Because one `tokio` dispatcher multiplexes every request behind its id, telemetry and LLM
+tokens stream back as `STREAM` frames while a slow file scan is still running.
+
+## Quick start
+
+### Option A — Install a release (no Rust needed)
+
+1. **Extension** — download `rust-sentinel-extension.zip` from the
+   [latest release](https://github.com/sovith3/rust-sentinel-bridge/releases/latest), extract
+   it, open `chrome://extensions`, enable **Developer mode**, click **Load unpacked** and pick
+   the extracted folder. Copy the 32-character id shown on the card.
+2. **Native host** — download `rust-sentinel-bridge-win64.zip`, extract it, then:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\install.ps1
+   ```
+
+   Paste the extension id when prompted. The script copies the binary to
+   `%LOCALAPPDATA%\RustSentinelBridge`, writes the native messaging manifest, saves
+   `extension_id.txt`, and registers the host under `HKCU` for Chrome, Edge, Brave, Vivaldi
+   and Chromium. No administrator rights and no `PATH` changes.
+3. **Verify** — reload the extension and open the
+   [live demo](https://sovith3.github.io/rust-sentinel-bridge/). The badge turns green when
+   the Rust host answers a `PING`.
+
+> Prefer the GUI? Running `rust-sentinel-bridge.exe` once without arguments does the same
+> installation with a message box; it reads the id from
+> `%LOCALAPPDATA%\RustSentinelBridge\extension_id.txt` or `RUST_SENTINEL_EXTENSION_ID`.
+
+Uninstall at any time:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -Uninstall
+```
+
+### Option B — Build from source
+
+Requires Rust stable plus the MSVC build tools (or the GNU fallback below).
+
+```bash
+git clone https://github.com/sovith3/rust-sentinel-bridge
+cd rust-sentinel-bridge/native-host
+cargo build --release --locked
+```
+
+Register it from the repository root — `install.ps1` finds the cargo output automatically:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
+
+* **MSVC toolchain** (default on Windows): nothing else is needed — the CRT is statically
+  linked through `.cargo/config.toml`.
+* **No MSVC linker?** Install the GNU toolchain plus a full MinGW-w64 distribution (GCC **and**
+  binutils: `x86_64-w64-mingw32-gcc`, `as`, `dlltool`) and put its `bin` directory on
+  `PATH`, then:
+
+  ```bash
+  rustup toolchain install stable-x86_64-pc-windows-gnu
+  cargo +stable-x86_64-pc-windows-gnu build --release
+  ```
+
+  A bundled `dlltool` alone is not enough: it shells out to `as`, so a `dlltool` without
+  binutils fails with `CreateProcess`.
+
 ## Contents
 
 | Path | What it is |
@@ -32,6 +123,8 @@ length prefix, spawned by the browser itself and locked to a single extension ID
 | `extension/` | Manifest V3 extension: service worker + content script + popup. |
 | `web-demo/` | Single-file demo UI that drives all four adapters from a plain HTML page. |
 | `docs/PROTOCOL.md` | Wire protocol, frame schema, every action and its payload. |
+| `install.ps1` | One-shot installer: copies the host, writes the manifest, registers the HKCU keys. |
+| `.github/workflows/` | CI (fmt, clippy, build) and tag-driven release automation. |
 
 ## Adapters
 
@@ -46,73 +139,59 @@ length prefix, spawned by the browser itself and locked to a single extension ID
 All adapters run inside one process behind a `tokio` dispatcher with per-request ids, so
 streaming telemetry and a long LLM answer can be in flight at the same time.
 
-## Quick start
+## Requirements
 
-### 1. Build the host
+| | |
+| --- | --- |
+| OS | Windows 10 or 11, x64 |
+| Browser | Chrome, Edge, Brave, Vivaldi or Chromium 116+ |
+| Rust host | Nothing to install — the release ships a statically linked `.exe` |
+| Optional | [Ollama](https://ollama.com) on `127.0.0.1:11434` for the AI adapter |
+| Optional | Riot Client running locally for the League LCU adapter |
 
-```bash
-cd native-host
-cargo build --release
+## Manual installation (no script)
+
+`install.ps1` is a convenience wrapper around three steps you can also do by hand.
+
+**1. Binary + manifest.** Keep `rust-sentinel-bridge.exe` in a permanent folder (for example
+`%LOCALAPPDATA%\RustSentinelBridge`) and create `com.rustsentinel.bridge.json` next to it:
+
+```json
+{
+  "name": "com.rustsentinel.bridge",
+  "description": "Rust Sentinel Bridge native messaging host",
+  "path": "C:\\Users\\<you>\\AppData\\Local\\RustSentinelBridge\\rust-sentinel-bridge.exe",
+  "type": "stdio",
+  "allowed_origins": ["chrome-extension://<32-char-extension-id>/"]
+}
 ```
 
-Artifacts land in `native-host/target/release/rust-sentinel-bridge.exe`.
-
-* MSVC toolchain (default on Windows): nothing else is needed — the CRT is statically
-  linked through `.cargo/config.toml`.
-* No MSVC linker? Install the GNU toolchain plus a full MinGW-w64 distribution (GCC **and**
-  binutils: `x86_64-w64-mingw32-gcc`, `as`, `dlltool`) and put its `bin` directory on
-  `PATH`, then:
-
-  ```bash
-  rustup toolchain install stable-x86_64-pc-windows-gnu
-  cargo +stable-x86_64-pc-windows-gnu build --release
-  ```
-
-  The bundled `dlltool` alone is not enough: it shells out to `as` to build import
-  libraries, so a `dlltool` without binutils fails with `CreateProcess`.
-
-### 2. Install the native host manifest
-
-Run the executable **once without arguments**:
+**2. Registry.** Point the browser at that JSON (no administrator rights needed):
 
 ```powershell
-.\target\release\rust-sentinel-bridge.exe
+$key = "HKCU:\Software\Google\Chrome\NativeMessagingHosts\com.rustsentinel.bridge"
+New-Item -Path $key -Force | Out-Null
+Set-ItemProperty -Path $key -Name "(Default)" `
+  -Value "$env:LOCALAPPDATA\RustSentinelBridge\com.rustsentinel.bridge.json"
 ```
 
-It copies itself to `%LOCALAPPDATA%\RustSentinelBridge\rust-sentinel-bridge.exe`,
-writes `com.rustsentinel.bridge.json` next to it, then registers the manifest under both
-browsers:
+Repeat under `HKCU:\Software\Microsoft\Edge\NativeMessagingHosts\com.rustsentinel.bridge`
+for Edge. The manifest pins `allowed_origins` to exactly one extension id, so any other
+extension (or a web page) cannot spawn the host.
 
-* `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.rustsentinel.bridge`
-* `HKCU\Software\Microsoft\Edge\NativeMessagingHosts\com.rustsentinel.bridge`
+**3. Extension id.** Load `extension/` as an unpacked extension
+(`chrome://extensions` → *Load unpacked*) and copy the id Chrome assigns. The host also
+accepts `RUST_SENTINEL_EXTENSION_ID` or `%LOCALAPPDATA%\RustSentinelBridge\extension_id.txt`
+when you run the `.exe` installer instead.
 
-Any other Chromium browser (Brave, Vivaldi, Opera) works too — point its
-`NativeMessagingHosts\com.rustsentinel.bridge` key at the same JSON file. The manifest pins
-`allowed_origins` to exactly one extension id.
+## Open the demo
 
-### 3. Tell the host which extension id to trust
+Open `web-demo/index.html` from disk or use the hosted copy on
+[GitHub Pages](https://sovith3.github.io/rust-sentinel-bridge/). The page states
+**Bridge Connected** or **Extension Not Detected** and prints the next step under the badge.
 
-Load `extension/` as an unpacked extension (`chrome://extensions` → *Load unpacked*),
-copy the id Chrome assigns, then pick **one** of:
-
-```powershell
-# a) one-shot environment variable
-$env:RUST_SENTINEL_EXTENSION_ID = "<32-char-id>"
-
-# b) persistent file (recommended)
-"%LOCALAPPDATA%\RustSentinelBridge\extension_id.txt"   # contains the id on one line
-```
-
-Re-run the installer, then reload the extension. The id is validated (`[a-p]{32}`), so a
-placeholder value fails loudly instead of silently producing a broken registry entry.
-
-### 4. Open the demo
-
-Load `web-demo/index.html` (or serve it) and pick a tab. The extension's content script
-injects into `https://*/*`, `http://localhost/*`, `http://127.0.0.1/*` and `file:///*`.
-
-The popup (`chrome://extensions` → *Rust Sentinel Bridge*) exposes the same actions plus
-an auto-scan hook for finished downloads.
+The popup (`chrome://extensions` → *Rust Sentinel Bridge*) exposes the same actions plus an
+auto-scan hook for finished downloads.
 
 ## Calling the bridge from a web page
 
@@ -201,6 +280,14 @@ Debugging tips:
 * Installer output is appended to `%LOCALAPPDATA%\RustSentinelBridge\bridge.log`.
 * `chrome://extensions` → *service worker* → console shows every frame the port receives.
 * The demo page prints its own `console.info("[bridge] ping", …)` on every heartbeat.
+
+## Contributing
+
+Issues and pull requests are welcome. CI runs `cargo fmt --check`, `cargo clippy
+--all-targets -- -D warnings`, the MSVC and GNU builds, and a syntax check of the extension
+and demo scripts.
+
+If this project saved you from writing a localhost server, a ⭐ helps other people find it.
 
 ## License
 

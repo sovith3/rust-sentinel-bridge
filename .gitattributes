@@ -3,4 +3,5 @@
 
 # Keep generated/binary assets untouched.
 *.png binary
+*.gif binary
 *.exe binary

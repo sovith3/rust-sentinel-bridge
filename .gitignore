@@ -1,6 +1,8 @@
 # Build output
 target/
 native-host/target/
+native-host/dist/
+dist/
 **/*.rs.bk
 *.pdb
 *.exe
@@ -23,5 +25,6 @@ npm-debug.log*
 *.local.json
 com.rustsentinel.bridge.json
 extension_id.txt
+SHA256SUMS.txt
 host.log
 bridge.log

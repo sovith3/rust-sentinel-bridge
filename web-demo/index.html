@@ -74,6 +74,7 @@ header.top {
 
 h1 { margin: 0; font-size: 19px; letter-spacing: 0.02em; }
 .brand p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+.brand p.sub { margin-top: 1px; font-size: 10.5px; color: #5b7089; }
 
 .status-bar {
   display: flex;
@@ -98,6 +99,83 @@ h1 { margin: 0; font-size: 19px; letter-spacing: 0.02em; }
 .dot.waiting { background: var(--warn); color: var(--warn); }
 
 .status-bar span.sep { color: #24384f; }
+
+.connect {
+  display: grid;
+  grid-template-columns: auto minmax(220px, 1fr) auto;
+  gap: 6px 14px;
+  align-items: center;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(8, 14, 22, 0.72);
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.connect .dot { width: 10px; height: 10px; }
+
+.connect h2 { margin: 0; font-size: 14px; font-weight: 700; letter-spacing: 0.01em; }
+.connect p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+
+.connect.waiting { border-color: rgba(255, 200, 87, 0.35); background: rgba(255, 200, 87, 0.05); }
+.connect.waiting h2 { color: var(--warn); }
+.connect.online { border-color: rgba(56, 242, 176, 0.45); background: rgba(56, 242, 176, 0.06); }
+.connect.online h2 { color: var(--accent); }
+.connect.offline { border-color: rgba(255, 92, 122, 0.4); background: rgba(255, 92, 122, 0.05); }
+.connect.offline h2 { color: var(--danger); }
+
+.connect .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(10, 18, 28, 0.8);
+  color: var(--text);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: all 140ms ease;
+}
+
+.pill:hover { border-color: var(--accent); color: var(--accent); }
+
+#connectSteps {
+  grid-column: 1 / -1;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(27, 43, 63, 0.9);
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+#connectSteps[hidden] { display: none; }
+
+#connectSteps ol { margin: 0; padding-left: 20px; }
+#connectSteps li { margin-bottom: 5px; }
+#connectSteps strong { color: var(--text); }
+#connectSteps code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: #071019;
+  border: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: #a7eccd;
+}
+
+
+@media (max-width: 760px) {
+  .connect { grid-template-columns: auto 1fr; }
+  .connect .actions { grid-column: 1 / -1; justify-content: flex-start; }
+}
 
 nav.tabs {
   display: flex;
@@ -272,6 +350,7 @@ footer.page a { color: var(--muted); }
     <div>
       <h1>Rust Sentinel Bridge</h1>
       <p>Native messaging · zero open ports · Rust 2021 · Apache-2.0</p>
+      <p class="sub">Static page: everything below is plain HTML/CSS/JS. The extension injects the bridge.</p>
     </div>
   </div>
   <div class="status-bar">
@@ -281,6 +360,26 @@ footer.page a { color: var(--muted); }
     <span id="latencyText">-- ms</span>
   </div>
 </header>
+
+<section class="connect waiting" id="connectBanner" aria-live="polite">
+  <i class="dot waiting" id="connectDot"></i>
+  <div>
+    <h2 id="connectTitle">Waiting for the extension…</h2>
+    <p id="connectDetail">Looking for the Rust Sentinel Bridge content script on this page.</p>
+  </div>
+  <div class="actions">
+    <a class="pill" href="https://github.com/sovith3/rust-sentinel-bridge/releases/latest">Download</a>
+    <a class="pill" href="https://github.com/sovith3/rust-sentinel-bridge#quick-start">Install guide</a>
+    <button class="pill" id="connectRetry" type="button">Re-check</button>
+  </div>
+  <div id="connectSteps">
+    <ol>
+      <li><strong>Load the extension</strong> — download <code>rust-sentinel-extension.zip</code>, extract it, open <code>chrome://extensions</code>, enable <em>Developer mode</em> → <em>Load unpacked</em>, and pick the extracted folder. Copy the 32-character id.</li>
+      <li><strong>Register the native host</strong> — unzip <code>rust-sentinel-bridge-win64.zip</code> and run <code>powershell -ExecutionPolicy Bypass -File .\install.ps1</code>, then paste the extension id. It only writes to <code>%LOCALAPPDATA%</code> and <code>HKCU</code>.</li>
+      <li><strong>Reload this page</strong> — the badge above turns green as soon as the Rust host answers a <code>PING</code> over the native messaging pipe.</li>
+    </ol>
+  </div>
+</section>
 
 <nav class="tabs" role="tablist">
   <button role="tab" aria-selected="true" data-panel="security">Security Scanner</button>
@@ -463,7 +562,12 @@ footer.page a { color: var(--muted); }
 
 <footer class="page">
   <span>Native Messaging host · <code>com.rustsentinel.bridge</code></span>
-  <span>Running in demo mode until the extension injects the content script. <a href="../README.md">README</a></span>
+  <span>
+    <a href="https://github.com/sovith3/rust-sentinel-bridge">Source</a> ·
+    <a href="https://github.com/sovith3/rust-sentinel-bridge#quick-start">Install guide</a> ·
+    <a href="https://github.com/sovith3/rust-sentinel-bridge/blob/main/docs/PROTOCOL.md">Protocol</a> ·
+    <a href="https://github.com/sovith3/rust-sentinel-bridge/releases/latest">Releases</a>
+  </span>
 </footer>
 
 <script>
@@ -492,10 +596,42 @@ footer.page a { color: var(--muted); }
     return days > 0 ? `${days}d ${hours}h` : `${hours}h ${minutes}m`;
   }
 
-  function setConnection(online, label) {
-    const dot = $("statusDot");
-    dot.className = `dot ${online ? "online" : "waiting"}`;
-    $("statusText").textContent = label;
+  const CONNECT_TITLES = {
+    waiting: "Waiting for the extension…",
+    online: "Bridge Connected",
+    "host-offline": "Extension loaded · native host offline",
+    offline: "Extension Not Detected"
+  };
+
+  const CONNECT_LABELS = {
+    waiting: "waiting for extension…",
+    online: "bridge connected",
+    "host-offline": "native host offline",
+    offline: "extension not detected"
+  };
+
+  /** True as soon as the content script forwards anything to this page. */
+  let extensionSeen = false;
+
+  /** state: "waiting" | "online" | "host-offline" | "offline" */
+  function setBridgeState(state, detail) {
+    const tone = state === "online" ? "online" : state === "waiting" ? "waiting" : "offline";
+    const dotTone = tone === "online" ? "online" : tone === "waiting" ? "waiting" : "";
+
+    $("statusDot").className = `dot ${dotTone}`.trim();
+    $("statusText").textContent = CONNECT_LABELS[state] || state;
+    $("latencyText").hidden = tone !== "online";
+
+    const banner = $("connectBanner");
+    if (!banner) {
+      return;
+    }
+
+    banner.className = `connect ${tone}`;
+    $("connectDot").className = `dot ${dotTone}`.trim();
+    $("connectTitle").textContent = CONNECT_TITLES[state] || state;
+    $("connectDetail").textContent = detail || "No detail available.";
+    $("connectSteps").hidden = tone === "online";
   }
 
   function setLatency(ms) {
@@ -511,6 +647,8 @@ footer.page a { color: var(--muted); }
   function request(adapter, action, payload = {}, handlers = {}) {
     const id = crypto.randomUUID();
     pending.set(id, { ...handlers, startedAt: performance.now() });
+    // Nothing answers when the extension is absent; drop stale entries eventually.
+    setTimeout(() => pending.delete(id), 600000);
     window.postMessage(
       { channel: CHANNEL, direction: "to-extension", message: { id, adapter, action, payload } },
       "*"
@@ -526,8 +664,35 @@ footer.page a { color: var(--muted); }
         streamSinks.get(frame.adapter)(frame.data || {});
         return;
       }
-      if (frame.event === "STATUS" && frame.data && frame.data.connected !== undefined) {
-        setConnection(Boolean(frame.data.connected), frame.data.message || "bridge");
+      if (frame.id === "bridge-status") {
+        const data = frame.data || {};
+        const code = typeof data.code === "string" ? data.code : "";
+        if (frame.event === "ERROR") {
+          if (code.indexOf("NATIVE_") === 0) {
+            setBridgeState(
+              "host-offline",
+              `${code}: ${data.message || "the native host pipe is closed"}${data.hint ? ` · ${data.hint}` : ""}`
+            );
+          } else if (code === "EXTENSION_DISCONNECTED") {
+            setBridgeState("offline", "The extension was reloaded or updated. Refresh this page to reconnect.");
+          }
+          return;
+        }
+        if (frame.event === "STATUS") {
+          if (data.connected === false) {
+            if (/connecting/i.test(data.message || "")) {
+              setBridgeState("waiting", data.message);
+            } else {
+              setBridgeState(
+                "host-offline",
+                data.hint || data.message || "connectNative() failed: the host manifest is missing or its extension id differs."
+              );
+            }
+          } else {
+            // STATUS frames only come from a live background worker.
+            setBridgeState("online", data.message || "Native host connected over stdin/stdout.");
+          }
+        }
       }
       return;
     }
@@ -569,6 +734,7 @@ footer.page a { color: var(--muted); }
     if (!message || message.channel !== CHANNEL || message.direction !== "to-page") {
       return;
     }
+    extensionSeen = true;
     if (message.frame) {
       dispatch(message.frame);
     }
@@ -582,14 +748,24 @@ footer.page a { color: var(--muted); }
       { from: "web-demo" },
       {
         onResult(data) {
-          setLatency(performance.now() - startedAt);
-          setConnection(true, "bridge online");
+          const elapsed = Math.max(1, Math.round(performance.now() - startedAt));
+          setLatency(elapsed);
+          const adapters = Array.isArray(data.adapters) ? data.adapters.length : 0;
+          const version = data.version ? `v${data.version} ` : "";
+          setBridgeState(
+            "online",
+            `Native host ${version}answered in ${elapsed} ms${adapters ? ` · ${adapters} adapters live` : ""}.`
+          );
           if (!quiet) {
             console.info("[bridge] ping", data);
           }
         },
         onError(error) {
-          setConnection(false, error.code || "bridge error");
+          if (extensionSeen) {
+            setBridgeState("host-offline", `${error.code || "ERROR"}: ${error.message || "no answer from the host"}`);
+          } else {
+            setBridgeState("offline", `${error.code || "ERROR"}: ${error.message || "no answer"}`);
+          }
         }
       }
     );
@@ -999,12 +1175,26 @@ footer.page a { color: var(--muted); }
 
   window.addEventListener("resize", drawCpuChart);
 
+  $("connectRetry").addEventListener("click", () => {
+    setBridgeState("waiting", "Re-sending PING over the native messaging channel…");
+    ping(false);
+  });
+
+  setBridgeState("waiting", "Looking for the Rust Sentinel Bridge content script on this page.");
+
   ping(false);
   setInterval(() => ping(true), 5000);
 
-  if (!window.chrome || !window.chrome.runtime || !window.chrome.runtime.id) {
-    setConnection(false, "extension not detected");
-  }
+  // No frame of any kind within 4 s means the content script never ran here:
+  // the extension is missing, disabled, or has no match for this origin.
+  setTimeout(() => {
+    if (!extensionSeen) {
+      setBridgeState(
+        "offline",
+        "No handshake on the rust-sentinel-bridge channel after 4 s. Install the extension, enable it for this origin, then reload."
+      );
+    }
+  }, 4000);
 })();
 </script>
 
