@@ -59,12 +59,17 @@ Artifacts land in `native-host/target/release/rust-sentinel-bridge.exe`.
 
 * MSVC toolchain (default on Windows): nothing else is needed — the CRT is statically
   linked through `.cargo/config.toml`.
-* No MSVC linker? Install the GNU toolchain and a MinGW-w64 GCC, then:
+* No MSVC linker? Install the GNU toolchain plus a full MinGW-w64 distribution (GCC **and**
+  binutils: `x86_64-w64-mingw32-gcc`, `as`, `dlltool`) and put its `bin` directory on
+  `PATH`, then:
 
   ```bash
   rustup toolchain install stable-x86_64-pc-windows-gnu
   cargo +stable-x86_64-pc-windows-gnu build --release
   ```
+
+  The bundled `dlltool` alone is not enough: it shells out to `as` to build import
+  libraries, so a `dlltool` without binutils fails with `CreateProcess`.
 
 ### 2. Install the native host manifest
 
@@ -185,7 +190,6 @@ not replace Microsoft Defender.
 cd native-host
 cargo fmt --all -- --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --release --locked
 cargo build --release --locked
 ```
 

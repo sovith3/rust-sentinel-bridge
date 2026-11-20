@@ -11,12 +11,13 @@ repository = "https://github.com/sovith3/rust-sentinel-bridge"
 description = "Universal zero-port bridge connecting HTTPS web apps to Windows security APIs, local AI (Ollama), hardware telemetry, and League of Legends LCU."
 
 [dependencies]
-tokio = { version = "1", features = ["full"] }
+# Async runtime: multi-threaded scheduler + channels + timers (the host runs
+# dedicated reader/writer OS threads around this dispatcher).
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time"] }
 tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
 native-tls = "0.2"
 futures-util = "0.3"
 reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "native-tls"] }
-serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 base64 = "0.22"
 sha2 = "0.10"

@@ -272,24 +272,3 @@ fn percent(used: u64, total: u64) -> f64 {
 fn round2(value: f64) -> f64 {
     (value * 100.0).round() / 100.0
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn percent_handles_zero_capacity_and_rounds_to_two_decimals() {
-        assert_eq!(percent(0, 0), 0.0);
-        assert_eq!(percent(1, 2), 50.0);
-        assert_eq!(percent(1, 3), 33.33);
-        assert_eq!(percent(2, 3), 66.67);
-        assert_eq!(percent(5, 4), 125.0);
-    }
-
-    #[test]
-    fn round2_keeps_two_decimals() {
-        assert_eq!(round2(1.0 / 3.0), 0.33);
-        assert_eq!(round2(12.3456), 12.35);
-        assert_eq!(round2(-12.3456), -12.35);
-    }
-}

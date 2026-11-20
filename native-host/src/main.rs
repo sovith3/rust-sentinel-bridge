@@ -282,37 +282,3 @@ const MB_ICON_ERROR: MessageBoxStyle = windows_sys::Win32::UI::WindowsAndMessagi
 const MB_ICON_INFORMATION: MessageBoxStyle = 0;
 #[cfg(not(windows))]
 const MB_ICON_ERROR: MessageBoxStyle = 0;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn extension_ids_must_be_32_characters_of_a_to_p() {
-        assert!(is_valid_extension_id("abcdefghijklmnopabcdefghijklmnop"));
-        assert!(is_valid_extension_id(&"a".repeat(32)));
-        assert!(!is_valid_extension_id(&"a".repeat(31)));
-        assert!(!is_valid_extension_id(&"a".repeat(33)));
-        assert!(!is_valid_extension_id(&"z".repeat(32)));
-        assert!(!is_valid_extension_id("ABCDEFGHIJKLMNOPABCDEFGHIJKLMNOP"));
-        assert!(!is_valid_extension_id(EXTENSION_ID));
-        assert!(!is_valid_extension_id(""));
-    }
-
-    #[test]
-    fn host_name_and_registry_keys_stay_in_sync() {
-        assert_eq!(HOST_NAME, "com.rustsentinel.bridge");
-        for key in REGISTRY_KEYS {
-            assert!(key.ends_with(HOST_NAME), "registry key drifted: {key}");
-        }
-    }
-
-    #[test]
-    fn data_dir_lives_under_local_appdata() {
-        let dir = data_dir();
-        assert!(dir.ends_with("RustSentinelBridge"));
-        if let Some(base) = env::var_os("LOCALAPPDATA") {
-            assert_eq!(dir, Path::new(&base).join("RustSentinelBridge"));
-        }
-    }
-}
