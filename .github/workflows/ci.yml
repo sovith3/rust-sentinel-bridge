@@ -212,6 +212,8 @@ jobs:
             Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue
             Remove-Item -LiteralPath $log -Force -ErrorAction SilentlyContinue
           }
+          # The runner finishes a pwsh step with `exit $LASTEXITCODE`.
+          $LASTEXITCODE = 0
 
       - name: Reject an invalid extension id
         shell: pwsh
@@ -238,3 +240,5 @@ jobs:
             Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue
             Remove-Item -LiteralPath $log -Force -ErrorAction SilentlyContinue
           }
+          # The child process is expected to fail; do not let the runner inherit it.
+          $LASTEXITCODE = 0
