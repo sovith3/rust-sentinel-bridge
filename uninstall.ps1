@@ -9,6 +9,13 @@
     older builds under a different folder or host name), and removes the install
     folder(s) of the current and legacy layouts.
 
+    One command, nothing to unzip:
+
+        irm https://github.com/sovith3/rust-sentinel-bridge/releases/latest/download/uninstall.ps1 | iex
+
+    When the script is piped into PowerShell the switches below are not available;
+    download it (or use the copy from the release bundle) to run -DryRun or -KeepLog.
+
     Nothing needs administrator rights. The HKLM branch is only touched when the
     script is started elevated, so a normal user run is a pure HKCU cleanup.
 
@@ -45,18 +52,30 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# Piped into PowerShell (irm ... | iex) there is no script path, and `exit` would close
+# the console window the user is reading.
+$script:FromFile = $false
+try {
+    $script:FromFile = [bool]$MyInvocation.MyCommand.Path
+} catch {
+    $script:FromFile = $false
+}
+
 # Show a single readable line instead of a PowerShell stack trace.
 trap {
     Write-Host ""
     Write-Host "Uninstall failed: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host "Docs: https://github.com/sovith3/rust-sentinel-bridge" -ForegroundColor DarkGray
-    exit 1
+    if ($script:FromFile) {
+        exit 1
+    }
 }
 
 $HostName = "com.rustsentinel.bridge"
 $ExeName = "rust-sentinel-bridge.exe"
 $ManifestName = "$HostName.json"
 $ProjectUrl = "https://github.com/sovith3/rust-sentinel-bridge"
+$InstallUrl = "$ProjectUrl/releases/latest/download/install.ps1"
 
 # Anything that looks like this project: current name, legacy folder names.
 $ProjectMarker = "(?i)rust[-_ .]?sentinel[-_ .]?bridge|rustsentinel"
@@ -380,7 +399,12 @@ Write-Host "Final step (manual, two clicks):" -ForegroundColor Cyan
 Write-Host "  1. Open chrome://extensions (or edge://extensions)."
 Write-Host "  2. Click 'Remove' on the Rust Sentinel Bridge card."
 Write-Host ""
-Write-Host "Reinstall any time with install.ps1.  Docs: $ProjectUrl"
+Write-Host "Reinstall any time:" -ForegroundColor Cyan
+Write-Host "  irm $InstallUrl | iex"
+Write-Host ""
+Write-Host "Docs: $ProjectUrl"
 Write-Host ""
 
-exit 0
+if ($script:FromFile) {
+    exit 0
+}

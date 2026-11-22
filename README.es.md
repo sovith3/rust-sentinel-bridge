@@ -14,6 +14,7 @@ errores de CORS.**
 
 **[Demo en vivo](https://sovith3.github.io/rust-sentinel-bridge/)** ·
 **[Última release](https://github.com/sovith3/rust-sentinel-bridge/releases/latest)** ·
+**[Guía de instalación](docs/INSTALL.es.md)** ·
 **[Protocolo](docs/PROTOCOL.md)** ·
 **[README completo (inglés)](README.md)**
 
@@ -36,7 +37,54 @@ que `fetch()` nunca podría tocar.
 
 ## Inicio rápido
 
-### Opción A — Instalar una release (no necesitas Rust)
+### Opción A — Un solo comando (Windows 10/11, sin Rust)
+
+Abre **PowerShell** (sin permisos de administrador) y pega:
+
+```powershell
+irm https://github.com/sovith3/rust-sentinel-bridge/releases/latest/download/install.ps1 | iex
+```
+
+Esa línea descarga el instalador de la última release y lo ejecuta. El instalador verifica el
+binario contra el `SHA256SUMS.txt` publicado, lo copia a `%LOCALAPPDATA%\RustSentinelBridge`,
+escribe el manifiesto de native messaging y guarda `extension_id.txt`, y por último registra el
+host en `HKCU` para Chrome, Edge, Brave, Vivaldi y Chromium. Sin permisos de administrador, sin
+tocar el `PATH`, sin servicios y sin puertos abiertos.
+
+Después carga la extensión **una vez**. Solo el navegador puede crear su id de 32 caracteres:
+
+1. Abre `chrome://extensions` (Edge: `edge://extensions`) y activa **Modo de desarrollador**.
+2. Pulsa **Cargar descomprimida** y elige `%LOCALAPPDATA%\RustSentinelBridge\extension` — el
+   instalador la descomprime ahí cuando todavía no conoce tu id. ¿Ya la tenías cargada desde
+   otra carpeta? Consérvala y pega ese id.
+3. Si el instalador sigue esperando, pega el id de la tarjeta y pulsa Enter.
+
+Recarga la extensión y abre la [demo en vivo](https://sovith3.github.io/rust-sentinel-bridge/):
+el indicador se pone verde cuando el host Rust responde a un `PING`.
+
+**Guía completa paso a paso, problemas frecuentes e instalación desatendida:
+[docs/INSTALL.es.md](docs/INSTALL.es.md)** (English: [docs/INSTALL.md](docs/INSTALL.md)).
+
+> ¿Prefieres interfaz gráfica? Ejecutar `rust-sentinel-bridge.exe` una vez sin argumentos hace
+> la misma instalación con un cuadro de diálogo; lee el id de
+> `%LOCALAPPDATA%\RustSentinelBridge\extension_id.txt` o de `RUST_SENTINEL_EXTENSION_ID`.
+
+Desinstalar en cualquier momento y desde cualquier versión, también en una línea:
+
+```powershell
+irm https://github.com/sovith3/rust-sentinel-bridge/releases/latest/download/uninstall.ps1 | iex
+```
+
+`uninstall.ps1` cierra el host si está corriendo, borra los registros de todos los navegadores
+Chromium (diseño actual y antiguos) y elimina las carpetas de instalación, sin permisos de
+administrador. Para usar `-DryRun` (ver qué borraría) o `-KeepLog` (guardar `bridge.log`)
+ejecuta el archivo descargado en lugar del comando por tubería: un comando así no puede pasar
+parámetros.
+
+### Opción B — Instalación manual desde el zip de la release
+
+Úsala si PowerShell está restringido, no hay conexión o quieres leer el script antes de
+ejecutarlo.
 
 1. Descarga `rust-sentinel-extension.zip` de la
    [última release](https://github.com/sovith3/rust-sentinel-bridge/releases/latest),
@@ -48,29 +96,17 @@ que `fetch()` nunca podría tocar.
    powershell -ExecutionPolicy Bypass -File .\install.ps1
    ```
 
-   Pega el id cuando lo pida. El script copia el binario a
-   `%LOCALAPPDATA%\RustSentinelBridge`, escribe el manifiesto, guarda `extension_id.txt` y
-   registra el host en `HKCU` para Chrome, Edge, Brave, Vivaldi y Chromium. Sin permisos de
-   administrador y sin tocar el `PATH`.
+   Pega el id cuando lo pida. El mismo script acepta `-ExtensionId <id>`, `-InstallDir <ruta>`,
+   `-ExePath <archivo>`, `-DryRun` (no escribe en el registro) y `-NoDownload` (no contacta con
+   GitHub).
 3. Recarga la extensión y abre la
-   [demo en vivo](https://sovith3.github.io/rust-sentinel-bridge/). El indicador se pone
-   verde cuando el host responde a un `PING`.
+   [demo en vivo](https://sovith3.github.io/rust-sentinel-bridge/). El indicador se pone verde
+   cuando el host responde a un `PING`.
 
-Desinstalar (vale para **cualquier** versión, la actual o una antigua):
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\uninstall.ps1
-```
-
-`uninstall.ps1` cierra el host si está corriendo, borra las claves de native messaging de
-todos los navegadores Chromium y elimina la carpeta de instalación (y las rutas antiguas).
-Sin permisos de administrador. Añade `-DryRun` para ver qué borraría y `-KeepLog` para
-guardar `bridge.log` en el Escritorio antes de eliminarlo.
-
-### Opción B — Compilar desde el código fuente
+### Opción C — Compilar desde el código fuente
 
 Necesitas Rust estable y las build tools de MSVC (o el fallback GNU documentado en el
-[README en inglés](README.md#option-b--build-from-source)).
+[README en inglés](README.md#option-c--build-from-source)).
 
 ```bash
 git clone https://github.com/sovith3/rust-sentinel-bridge
@@ -90,8 +126,9 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 | --- | --- |
 | [`README.md`](README.md) | Guía completa: adaptadores, seguridad, API desde la página y desarrollo. |
 | [`docs/PROTOCOL.md`](docs/PROTOCOL.md) | Protocolo de tramas, acciones y payloads de cada adaptador. |
+| [`docs/INSTALL.es.md`](docs/INSTALL.es.md) | Guía de instalación paso a paso, desinstalación y problemas frecuentes. |
 | [`web-demo/`](web-demo/index.html) | Demo estática que usa los cuatro adaptadores desde una página normal. |
-| [`install.ps1`](install.ps1) | Instalador: copia el binario, escribe el manifiesto y registra las claves HKCU. |
+| [`install.ps1`](install.ps1) | Instalador y punto de entrada del comando de una línea: descarga y verifica el binario, escribe el manifiesto y registra las claves HKCU. |
 | [`uninstall.ps1`](uninstall.ps1) | Desinstalador válido para cualquier versión: limpia registro, carpetas y procesos. |
 
 ## Solución rápida: no aparecen los eventos de selección de campeón

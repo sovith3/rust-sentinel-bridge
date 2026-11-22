@@ -172,3 +172,60 @@ jobs:
         shell: pwsh
         run: ./uninstall.ps1 -DryRun | Out-String | Write-Host
 
+      - name: Offline installer dry run
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $target = Join-Path $env:RUNNER_TEMP "rsb-ci"
+          $placeholder = "./rust-sentinel-bridge.exe"
+          New-Item -ItemType Directory -Force -Path $target | Out-Null
+          # This job has no cargo build, so the installer gets a stand-in binary. Windows
+          # PowerShell 5.1 is the target runtime, and a child process keeps its exit code
+          # from terminating this step.
+          Set-Content -LiteralPath $placeholder -Value "ci placeholder" -Encoding ascii
+          try {
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./install.ps1 -DryRun -NoDownload -ExtensionId abcdefghijklmnopabcdefghijklmnop -InstallDir $target 2>&1 | Out-String | Write-Host
+            if ($LASTEXITCODE -ne 0) {
+              throw "install.ps1 exited with $LASTEXITCODE"
+            }
+            $manifestPath = Join-Path $target "com.rustsentinel.bridge.json"
+            if (-not (Test-Path -LiteralPath $manifestPath)) {
+              throw "install.ps1 did not write the native messaging manifest"
+            }
+            $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+            $expected = "chrome-extension://abcdefghijklmnopabcdefghijklmnop/"
+            if ($manifest.allowed_origins.Count -ne 1 -or $manifest.allowed_origins[0] -ne $expected) {
+              throw "wrong allowed_origins: $($manifest.allowed_origins -join ', ')"
+            }
+            if ($manifest.type -ne "stdio" -or $manifest.name -ne "com.rustsentinel.bridge") {
+              throw "unexpected manifest: $($manifest | ConvertTo-Json -Compress)"
+            }
+            if (-not (Test-Path -LiteralPath (Join-Path $target "extension_id.txt"))) {
+              throw "install.ps1 did not record extension_id.txt"
+            }
+            Write-Host "install.ps1 dry run produced a valid manifest"
+          } finally {
+            Remove-Item -LiteralPath $placeholder -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Reject an invalid extension id
+        shell: pwsh
+        run: |
+          $target = Join-Path $env:RUNNER_TEMP "rsb-ci-bad"
+          $placeholder = "./rust-sentinel-bridge.exe"
+          Set-Content -LiteralPath $placeholder -Value "ci placeholder" -Encoding ascii
+          try {
+            $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./install.ps1 -DryRun -NoDownload -ExtensionId "zzzz" -InstallDir $target 2>&1 | Out-String
+            if ($LASTEXITCODE -eq 0) {
+              throw "install.ps1 accepted an invalid extension id"
+            }
+            if ($output -notmatch "Invalid extension id") {
+              Write-Host $output
+              throw "install.ps1 failed without explaining the id problem"
+            }
+            Write-Host "invalid id rejected with a readable message"
+          } finally {
+            Remove-Item -LiteralPath $placeholder -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue
+          }

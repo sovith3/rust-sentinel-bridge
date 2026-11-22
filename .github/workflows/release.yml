@@ -58,6 +58,7 @@ jobs:
           Copy-Item -LiteralPath $exe -Destination "$dist/rust-sentinel-bridge.exe"
           Copy-Item -LiteralPath "README.md", "LICENSE", "NOTICE", "install.ps1", "uninstall.ps1" -Destination $dist
           Copy-Item -LiteralPath "docs/PROTOCOL.md" -Destination "$dist/PROTOCOL.md"
+          Copy-Item -LiteralPath "docs/INSTALL.md" -Destination "$dist/INSTALL.md"
 
           # Portable bundle (exe + install.ps1 + docs) and the unpacked extension.
           $hostZip = "rust-sentinel-bridge-$tag-win64.zip"
@@ -73,7 +74,7 @@ jobs:
             throw "$extZip does not contain manifest.json at its root"
           }
           $hostEntries = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $hostZip)).Entries.FullName
-          foreach ($required in @("rust-sentinel-bridge.exe", "install.ps1", "uninstall.ps1")) {
+          foreach ($required in @("rust-sentinel-bridge.exe", "install.ps1", "uninstall.ps1", "INSTALL.md")) {
             if ($hostEntries -notcontains $required) {
               throw "$hostZip is missing $required"
             }
@@ -111,32 +112,48 @@ jobs:
             * The extension replays streaming requests after a service-worker or native
               host restart, and the demo page subscribes to champion select when you open
               the *League LCU* tab.
-            * New `uninstall.ps1`: removes any version of the bridge, current or legacy,
-              from every Chromium browser, no admin rights required.
+            * `install.ps1` now works as a one-line command: it downloads and verifies the
+              host, extracts the extension when it has to, and keeps `uninstall.ps1`
+              version-agnostic. Both scripts also survive being piped into PowerShell.
 
-            ### Install in three steps
+            ### Install in one command
 
-            1. Download `rust-sentinel-extension.zip`, extract it, then open
-               `chrome://extensions`, enable **Developer mode**, click **Load unpacked**
-               and pick the extracted folder. Copy the 32-character extension id.
-            2. Download `rust-sentinel-bridge-win64.zip`, extract it and run:
+            ```powershell
+            irm https://github.com/sovith3/rust-sentinel-bridge/releases/latest/download/install.ps1 | iex
+            ```
 
-               ```powershell
-               powershell -ExecutionPolicy Bypass -File .\install.ps1
-               ```
+            The installer fetches this release's binary, compares it with `SHA256SUMS.txt`,
+            installs it in `%LOCALAPPDATA%\RustSentinelBridge`, writes the native messaging
+            manifest and saves `extension_id.txt`, then registers the host under `HKCU` for
+            Chrome, Edge, Brave, Vivaldi and Chromium. No administrator rights, no `PATH`
+            changes, no service, no open port.
 
-               Paste the extension id when prompted. No administrator rights needed:
-               everything lives in `%LOCALAPPDATA%\RustSentinelBridge` and `HKCU`.
-            3. Reload the extension and open the live demo:
-               <https://sovith3.github.io/rust-sentinel-bridge/>
+            Then load the extension once - only the browser can create its 32-character id:
+
+            1. Open `chrome://extensions` (Edge: `edge://extensions`), enable **Developer mode**.
+            2. Click **Load unpacked** and pick `%LOCALAPPDATA%\RustSentinelBridge\extension` -
+               the installer extracts the extension there when it does not know your id yet.
+               Already loaded from another folder? Keep it and paste that id.
+            3. Paste the id into the installer if it is still waiting, press Enter, then click
+               the reload arrow on the extension card.
+
+            Open the live demo - <https://sovith3.github.io/rust-sentinel-bridge/> - and the
+            badge turns green once the host answers a `PING`.
+
+            Prefer the manual route? `rust-sentinel-bridge-{0}-win64.zip` still contains the
+            exe, `install.ps1`, `uninstall.ps1` and the docs, and `rust-sentinel-extension.zip`
+            holds the unpacked extension. Step-by-step guide for both paths:
+            [docs/INSTALL.md](https://github.com/sovith3/rust-sentinel-bridge/blob/main/docs/INSTALL.md).
 
             ### Uninstall any version
 
             ```powershell
-            powershell -ExecutionPolicy Bypass -File .\uninstall.ps1
+            irm https://github.com/sovith3/rust-sentinel-bridge/releases/latest/download/uninstall.ps1 | iex
             ```
 
-            Add `-DryRun` to see what would be removed, `-KeepLog` to keep `bridge.log`.
+            Add `-DryRun` to see what would be removed and `-KeepLog` to keep `bridge.log`;
+            those switches need the downloaded file, because a piped command cannot pass
+            arguments.
 
             Verify the download with:
 
