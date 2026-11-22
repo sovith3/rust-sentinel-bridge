@@ -74,6 +74,13 @@ button:active {
   transform: translateY(1px);
 }
 
+/* Secondary action (stop a stream) */
+button.ghost {
+  border-style: dashed;
+  color: var(--muted);
+  opacity: 0.85;
+}
+
 #log {
   margin: 12px 0 8px;
   padding: 10px;
