@@ -79,11 +79,16 @@ tokens stream back as `STREAM` frames while a slow file scan is still running.
 > installation with a message box; it reads the id from
 > `%LOCALAPPDATA%\RustSentinelBridge\extension_id.txt` or `RUST_SENTINEL_EXTENSION_ID`.
 
-Uninstall at any time:
+Uninstall at any time — `uninstall.ps1` ships in the same bundle and removes **any**
+version of the bridge (current or older), every Chromium registration and the install
+folder, without administrator rights:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\install.ps1 -Uninstall
+powershell -ExecutionPolicy Bypass -File .\uninstall.ps1
 ```
+
+`-DryRun` prints what would be removed, `-KeepLog` saves `bridge.log` to your Desktop.
+`install.ps1 -Uninstall` still works and forwards to `uninstall.ps1` when it is present.
 
 ### Option B — Build from source
 
@@ -124,6 +129,7 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 | `web-demo/` | Single-file demo UI that drives all four adapters from a plain HTML page. |
 | `docs/PROTOCOL.md` | Wire protocol, frame schema, every action and its payload. |
 | `install.ps1` | One-shot installer: copies the host, writes the manifest, registers the HKCU keys. |
+| `uninstall.ps1` | Version-agnostic uninstaller: stops the host, deletes every bridge registration and folder. |
 | `.github/workflows/` | CI (fmt, clippy, build) and tag-driven release automation. |
 
 ## Adapters
@@ -134,7 +140,7 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 | `security_scanner` | `SCAN_FILE`, `SCAN_DOWNLOADS_LATEST` | SHA-256, Shannon entropy, Authenticode via WinVerifyTrust, suspicious-API heuristics, 0-100 risk score. |
 | `ollama_bridge` | `LIST_MODELS`, `CHAT_STREAM` | Streaming client for a **loopback-only** Ollama endpoint (`127.0.0.1`, `localhost`, `[::1]`). |
 | `system_monitor` | `GET_SNAPSHOT`, `START_TELEMETRY`, `STOP_TELEMETRY` | CPU per core, memory, swap, disks, uptime, top CPU/RAM processes (sysinfo). |
-| `lol_lcu` | `GET_STATUS`, `GET_CHAMP_SELECT`, `SUBSCRIBE_CHAMP_SELECT`, `STOP_SUBSCRIPTION` | Reads the Riot Client `lockfile`, authenticates with HTTP Basic, streams champion-select events over `wss`. |
+| `lol_lcu` | `GET_STATUS`, `GET_CHAMP_SELECT`, `SUBSCRIBE_CHAMP_SELECT`, `STOP_SUBSCRIPTION` | Reads the Riot Client `lockfile`, authenticates with HTTP Basic, streams champion-select + gameflow events over `wss` with an HTTPS polling fallback. |
 
 All adapters run inside one process behind a `tokio` dispatcher with per-request ids, so
 streaming telemetry and a long LLM answer can be in flight at the same time.
@@ -280,6 +286,13 @@ Debugging tips:
 * Installer output is appended to `%LOCALAPPDATA%\RustSentinelBridge\bridge.log`.
 * `chrome://extensions` → *service worker* → console shows every frame the port receives.
 * The demo page prints its own `console.info("[bridge] ping", …)` on every heartbeat.
+* **Champion select shows nothing?** Open the *League LCU* tab of the demo: it subscribes
+  automatically. The host retries every 3 s, so the log starts whenever the client is in
+  champion select — no need to subscribe again after a browser or client restart. If your
+  League install lives outside the usual paths, point the host at it with
+  `RUST_SENTINEL_LCU_LOCKFILE=C:\path\to\lockfile`.
+* Nothing at all in the log? Run `uninstall.ps1 -KeepLog`, reinstall, reproduce, and read
+  the copied `bridge.log`.
 
 ## Contributing
 

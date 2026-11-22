@@ -140,25 +140,35 @@ jobs:
           NODE
 
   scripts:
-    name: Installer script
+    name: Installer scripts
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Parse install.ps1
+      - name: Parse install.ps1 and uninstall.ps1
         shell: pwsh
         run: |
-          $tokens = $null
-          $errors = $null
-          [System.Management.Automation.Language.Parser]::ParseFile(
-            (Join-Path $PWD "install.ps1"), [ref]$tokens, [ref]$errors) | Out-Null
-          if ($errors.Count -gt 0) {
-            $errors | ForEach-Object { Write-Host "::error::$($_.Message)" }
-            exit 1
+          foreach ($script in @("install.ps1", "uninstall.ps1")) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Join-Path $PWD $script), [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Host "::error file=$script::$($_.Message)" }
+              exit 1
+            }
+            Write-Host "$script parses cleanly"
           }
-          Write-Host "install.ps1 parses cleanly"
 
       - name: Show installer help
         shell: pwsh
         run: ./install.ps1 -? | Out-String | Write-Host
+
+      - name: Show uninstaller help
+        shell: pwsh
+        run: ./uninstall.ps1 -? | Out-String | Write-Host
+
+      - name: Uninstaller dry run
+        shell: pwsh
+        run: ./uninstall.ps1 -DryRun | Out-String | Write-Host
 

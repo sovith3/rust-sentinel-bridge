@@ -613,8 +613,12 @@ footer.page a { color: var(--muted); }
   /** True as soon as the content script forwards anything to this page. */
   let extensionSeen = false;
 
+  /** Last bridge state, so panels can react (auto-subscribe) when it turns green. */
+  let bridgeState = "waiting";
+
   /** state: "waiting" | "online" | "host-offline" | "offline" */
   function setBridgeState(state, detail) {
+    bridgeState = state;
     const tone = state === "online" ? "online" : state === "waiting" ? "waiting" : "offline";
     const dotTone = tone === "online" ? "online" : tone === "waiting" ? "waiting" : "";
 
@@ -759,6 +763,7 @@ footer.page a { color: var(--muted); }
           if (!quiet) {
             console.info("[bridge] ping", data);
           }
+          maybeAutoSubscribe();
         },
         onError(error) {
           if (extensionSeen) {
@@ -779,6 +784,8 @@ footer.page a { color: var(--muted); }
       for (const panel of document.querySelectorAll("section.panel")) {
         panel.classList.toggle("active", panel.id === `panel-${tab.dataset.panel}`);
       }
+      // Opening the League tab arms the champion-select log without extra clicks.
+      maybeAutoSubscribe();
     });
   }
 
@@ -1120,6 +1127,64 @@ footer.page a { color: var(--muted); }
     lcuLog(`${error.code || "ERROR"}: ${error.message || ""}`);
   }
 
+  /** One readable line per real change, from either transport (ws or poll). */
+  function formatChampSelect(event) {
+    const sequence = typeof event.sequence === "number" ? `#${event.sequence} ` : "";
+    const source = event.source ? `[${event.source}] ` : "";
+
+    if (event.inChampSelect === false) {
+      return `${sequence}${source}champion select ended`;
+    }
+
+    const summary = event.summary;
+    if (!summary) {
+      const phase = event.phase === undefined ? "" : ` ${JSON.stringify(event.phase)}`;
+      return `${sequence}${source}${event.event || "event"}${phase}`;
+    }
+
+    const picks = (summary.myTeam || [])
+      .map((member) => `${member.cellId}:${member.championId || member.championPickIntent || "-"}`)
+      .join(" ");
+    const seconds =
+      typeof summary.timeLeftMs === "number"
+        ? `${Math.round(summary.timeLeftMs / 1000)}s`
+        : "?";
+    const spectating = summary.isSpectating ? " · spectating" : "";
+    return `${sequence}${source}${summary.phase || "ChampSelect"} · ${seconds} left · ${picks}${spectating}`;
+  }
+
+  const lcuSink = (event) => lcuLog(formatChampSelect(event));
+
+  /** Subscribed once per page load; the service worker replays it after reconnects. */
+  let lcuAutoSubscribed = false;
+
+  function subscribeChampSelect() {
+    streamSinks.set("lol_lcu", lcuSink);
+    request("lol_lcu", "SUBSCRIBE_CHAMP_SELECT", {}, {
+      onStatus: (data) => lcuLog(data.message || "subscribing"),
+      onStream: lcuSink,
+      onResult(data) {
+        if (data.streaming) {
+          const events = Array.isArray(data.events) ? data.events.join(", ") : data.event;
+          lcuLog(`subscribed to ${events} · poll every ${data.pollIntervalMs} ms`);
+        }
+      },
+      onError: lcuError
+    });
+  }
+
+  function maybeAutoSubscribe() {
+    if (lcuAutoSubscribed || bridgeState !== "online") {
+      return;
+    }
+    if (!$("panel-lcu").classList.contains("active")) {
+      return;
+    }
+    lcuAutoSubscribed = true;
+    lcuLog("bridge online: subscribing to champion select automatically…");
+    subscribeChampSelect();
+  }
+
   $("lcuStatus").addEventListener("click", () => {
     lcuLog("reading lockfile + summoner …");
     request("lol_lcu", "GET_STATUS", {}, {
@@ -1148,23 +1213,14 @@ footer.page a { color: var(--muted); }
   });
 
   $("lcuSubscribe").addEventListener("click", () => {
-    streamSinks.set("lol_lcu", (event) => {
-      const payload = event.payload === undefined ? "" : ` ${JSON.stringify(event.payload).slice(0, 500)}`;
-      lcuLog(`#${event.sequence} ${event.event}${payload}`);
-    });
-    request("lol_lcu", "SUBSCRIBE_CHAMP_SELECT", {}, {
-      onStatus: (data) => lcuLog(data.message || "subscribing"),
-      onResult(data) {
-        if (data.streaming) {
-          lcuLog(`subscribed to ${data.event} (retry ${data.reconnectDelayMs} ms)`);
-        }
-      },
-      onError: lcuError
-    });
+    lcuAutoSubscribed = true;
+    lcuLog("subscribing to champion select …");
+    subscribeChampSelect();
   });
 
   $("lcuUnsubscribe").addEventListener("click", () => {
     streamSinks.delete("lol_lcu");
+    lcuAutoSubscribed = false;
     request("lol_lcu", "STOP_SUBSCRIPTION", {}, {
       onResult: () => lcuLog("subscription stopped"),
       onError: lcuError

@@ -186,8 +186,10 @@ Response: `{ "streaming": false, "stopped": true|false }`.
 ## `lol_lcu`
 
 Reads the Riot Client lockfile at
-`%LOCALAPPDATA%\Riot Games\Riot Client\Config\lockfile` (also probes the legacy League
-install path) and authenticates with HTTP Basic as `riot:<password>`.
+`%LOCALAPPDATA%\Riot Games\League of Legends\lockfile` (also probes the legacy League
+install path, the registry, `%PROGRAMDATA%\Riot Games\RiotClientInstalls.json` and every
+drive root) and authenticates with HTTP Basic as `riot:<password>`. Override the search
+with `RUST_SENTINEL_LCU_LOCKFILE=<absolute path>`.
 
 ### `GET_STATUS` / `PING`
 Response: `{ "connected": true, "port", "protocol", "processId", "lockfile", "baseUrl",
@@ -199,12 +201,65 @@ Response: `{ "inChampSelect": true, "session": <raw LCU session> }`, or
 `{ "inChampSelect": false, "reason": "…" }` when the client answers HTTP 404.
 
 ### `SUBSCRIBE_CHAMP_SELECT`
-Response: `{ "streaming": true, "event": "OnJsonApiEvent_lol-champ-select_v1_session", "reconnectDelayMs": 3000 }`.
-Then every WCS frame whose kind is `8` is forwarded as
-`STREAM { "event", "payload", "sequence" }`. Dropped sockets reconnect after 3 s.
+Response:
+
+```json
+{
+  "streaming": true,
+  "event": "OnJsonApiEvent_lol-champ-select_v1_session",
+  "events": [
+    "OnJsonApiEvent_lol-champ-select_v1_session",
+    "OnJsonApiEvent_lol-gameflow_v1_gameflow-phase"
+  ],
+  "pollIntervalMs": 1500,
+  "reconnectDelayMs": 3000
+}
+```
+
+Two transports feed the same log and both are always armed:
+
+* `wss://127.0.0.1:<port>` WAMP subscription (`[5, "EventName"]` out, `[8, "EventName", payload]`
+  in). The handshake is bounded to 10 s and every disconnect reconnects after 3 s.
+* An HTTPS poller (`/lol-gameflow/v1/gameflow-phase` every 1.5 s, plus
+  `/lol-champ-select/v1/session` while the phase is `ChampSelect`). It stays idle for 6 s
+  after a websocket frame, and always samples twice right after subscribing.
+
+A missing lockfile is **never** fatal: the subscription reports
+`waiting for the League client` once and keeps retrying, so subscribing before the game
+client starts still works.
+
+Every real change is published once, whichever transport notices it first:
+
+```json
+{
+  "event": "OnJsonApiEvent_lol-champ-select_v1_session",
+  "channel": "session",
+  "source": "ws",
+  "sequence": 7,
+  "inChampSelect": true,
+  "summary": {
+    "phase": "BAN_PICK",
+    "timeLeftMs": 21,
+    "isSpectating": false,
+    "localPlayerCellId": 2,
+    "myTeam": [{ "cellId": 1, "championId": 64, "championPickIntent": 0,
+                 "assignedPosition": "jungle", "summonerId": 123 }],
+    "theirTeam": [],
+    "bannedChampions": []
+  },
+  "payload": {}
+}
+```
+
+* `source` ∈ `ws` | `poll`.
+* `payload` is the untouched LCU object; `summary` is the stable projection used by the UIs.
+* Champion select ending is `STREAM { "inChampSelect": false, "payload": null }`.
+* `timeLeftMs` and the raw `payload` change every second, but they are excluded from the
+  change detection: one log line per pick/ban, not one per tick.
+* Phase frames use `channel: "phase"` and `event: "OnJsonApiEvent_lol-gameflow_v1_gameflow-phase"`.
 
 ### `STOP_SUBSCRIPTION`
-Response: `{ "streaming": false, "stopped": true|false }`.
+Response: `{ "streaming": false, "stopped": true|false }`. Aborts both transports.
 
 Errors: `LCU_NOT_RUNNING`, `LCU_AUTH_FAILED`, `LCU_REQUEST_FAILED`, `LCU_HTTP_ERROR`.
 
@@ -214,7 +269,12 @@ The service worker adds a thin browser-side envelope on top of this protocol:
 
 * `chrome.runtime.connectNative("com.rustsentinel.bridge")` is re-established with a
   2 s backoff whenever the port disconnects.
-* Requests time out after **120 s** and answer `BRIDGE_TIMEOUT` instead of hanging a UI.
+* Requests time out after **120 s** and answer `REQUEST_TIMEOUT` instead of hanging a UI.
+* Streaming requests (`SUBSCRIBE_CHAMP_SELECT`, `START_TELEMETRY`) are remembered in
+  memory and in `chrome.storage.session` (hence the `storage` permission) and replayed on
+  every native reconnect and whenever a new page port connects — a service-worker restart
+  no longer kills the champion-select log. `STOP_SUBSCRIPTION` / `STOP_TELEMETRY` forget
+  the entry.
 * `runtime.connect({ name: "sentinel-page" })` is the channel used by `content.js`; frames
   whose `event` is `STREAM` are broadcast to every connected page so unsolicited telemetry
   and LCU events reach whichever tab is listening.

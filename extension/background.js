@@ -12,6 +12,16 @@ const HOST_NAME = "com.rustsentinel.bridge";
 const RECONNECT_DELAY_MS = 2000;
 const REQUEST_TIMEOUT_MS = 120000;
 
+/**
+ * Requests that keep streaming until they are explicitly stopped. They are
+ * replayed after every native reconnect, because the host process that owned
+ * the previous subscription has exited with the old pipe: without this replay a
+ * champion-select log would go silent the moment the worker or the host
+ * restarts.
+ */
+const STREAMING_ACTIONS = new Set(["SUBSCRIBE_CHAMP_SELECT", "START_TELEMETRY"]);
+const STOP_ACTIONS = new Set(["STOP_SUBSCRIPTION", "STOP_TELEMETRY"]);
+
 let nativePort = null;
 let nativeReady = false;
 let reconnectTimer = null;
@@ -21,6 +31,67 @@ let sequence = 0;
 const pending = new Map();
 /** Ports opened by content scripts and by the popup. */
 const clients = new Set();
+/** adapter -> streaming request that must survive reconnects. */
+const subscriptions = new Map();
+
+const hasSessionStorage = Boolean(chrome.storage && chrome.storage.session);
+
+function saveSubscriptions() {
+  if (!hasSessionStorage) {
+    return;
+  }
+  const entries = {};
+  for (const [adapter, request] of subscriptions) {
+    entries[adapter] = request;
+  }
+  chrome.storage.session.set({ subscriptions: entries }).catch(() => {});
+}
+
+function loadSubscriptions() {
+  if (!hasSessionStorage) {
+    return;
+  }
+  chrome.storage.session
+    .get("subscriptions")
+    .then((stored) => {
+      const entries = (stored && stored.subscriptions) || {};
+      let restored = 0;
+      for (const [adapter, request] of Object.entries(entries)) {
+        if (request && request.action) {
+          subscriptions.set(adapter, request);
+          restored += 1;
+        }
+      }
+      if (restored > 0) {
+        replaySubscriptions();
+      }
+    })
+    .catch(() => {});
+}
+
+function rememberSubscription(request) {
+  const adapter = request.adapter || "core";
+  const action = request.action || "PING";
+  if (STREAMING_ACTIONS.has(action)) {
+    subscriptions.set(adapter, {
+      adapter,
+      action,
+      payload: request.payload || {}
+    });
+    saveSubscriptions();
+    return;
+  }
+  if (STOP_ACTIONS.has(action) && subscriptions.delete(adapter)) {
+    saveSubscriptions();
+  }
+}
+
+function replaySubscriptions() {
+  for (const request of subscriptions.values()) {
+    // No target port: the frames are broadcast to every client below.
+    sendRequest(request, null);
+  }
+}
 
 function newId() {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -93,7 +164,9 @@ function scheduleReconnect() {
   }
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
-    connectNative();
+    if (connectNative()) {
+      replaySubscriptions();
+    }
   }, RECONNECT_DELAY_MS);
 }
 
@@ -137,6 +210,8 @@ function sendRequest(request, port) {
     payload: request.payload || {}
   });
 
+  rememberSubscription(request);
+
   setTimeout(() => {
     if (pending.has(id)) {
       pending.delete(id);
@@ -165,6 +240,12 @@ chrome.runtime.onConnect.addListener((port) => {
 
   clients.add(port);
   connectNative();
+
+  // A page that reconnects (reload, new tab, worker wake-up) must receive the
+  // live champion-select stream again without clicking "subscribe" twice.
+  if (subscriptions.size > 0) {
+    replaySubscriptions();
+  }
 
   safePost(port, {
     id: "bridge-status",
@@ -221,3 +302,6 @@ if (chrome.downloads && chrome.downloads.onChanged) {
 chrome.runtime.onInstalled.addListener(() => {
   connectNative();
 });
+
+// The worker is torn down aggressively; this re-arms the stream it owned.
+loadSubscriptions();

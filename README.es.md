@@ -56,11 +56,16 @@ que `fetch()` nunca podría tocar.
    [demo en vivo](https://sovith3.github.io/rust-sentinel-bridge/). El indicador se pone
    verde cuando el host responde a un `PING`.
 
-Desinstalar:
+Desinstalar (vale para **cualquier** versión, la actual o una antigua):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\install.ps1 -Uninstall
+powershell -ExecutionPolicy Bypass -File .\uninstall.ps1
 ```
+
+`uninstall.ps1` cierra el host si está corriendo, borra las claves de native messaging de
+todos los navegadores Chromium y elimina la carpeta de instalación (y las rutas antiguas).
+Sin permisos de administrador. Añade `-DryRun` para ver qué borraría y `-KeepLog` para
+guardar `bridge.log` en el Escritorio antes de eliminarlo.
 
 ### Opción B — Compilar desde el código fuente
 
@@ -87,6 +92,15 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 | [`docs/PROTOCOL.md`](docs/PROTOCOL.md) | Protocolo de tramas, acciones y payloads de cada adaptador. |
 | [`web-demo/`](web-demo/index.html) | Demo estática que usa los cuatro adaptadores desde una página normal. |
 | [`install.ps1`](install.ps1) | Instalador: copia el binario, escribe el manifiesto y registra las claves HKCU. |
+| [`uninstall.ps1`](uninstall.ps1) | Desinstalador válido para cualquier versión: limpia registro, carpetas y procesos. |
+
+## Solución rápida: no aparecen los eventos de selección de campeón
+
+El host ya no se rinde. Reintenta la suscripción cada 3 s y, si el socket local está
+bloqueado (firewall, antivirus) o el cliente arrancó después, lee el mismo estado por
+HTTPS y lo publica igualmente. Abre la pestaña **League LCU** de la demo: se suscribe sola
+y el log empieza en cuanto entras en selección. Si tu League está en una ruta rara, define
+`RUST_SENTINEL_LCU_LOCKFILE=C:\ruta\al\lockfile`.
 
 ## Licencia
 

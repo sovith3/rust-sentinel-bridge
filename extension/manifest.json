@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "Rust Sentinel Bridge",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Zero-port bridge to Windows security APIs, local AI (Ollama), hardware telemetry and League of Legends LCU.",
   "minimum_chrome_version": "116",
-  "permissions": ["nativeMessaging", "downloads"],
+  "permissions": ["nativeMessaging", "downloads", "storage"],
   "background": {
     "service_worker": "background.js"
   },

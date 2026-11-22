@@ -14,6 +14,32 @@ function log(line) {
   logEl.scrollTop = logEl.scrollHeight;
 }
 
+/** Champion-select frames are frequent, so they get a one-line summary. */
+function describeStream(adapter, data) {
+  if (adapter !== "lol_lcu") {
+    return JSON.stringify(data).slice(0, 240);
+  }
+
+  const sequence = typeof data.sequence === "number" ? `#${data.sequence} ` : "";
+  const source = data.source ? `[${data.source}] ` : "";
+
+  if (data.inChampSelect === false) {
+    return `${sequence}${source}champion select ended`;
+  }
+
+  const summary = data.summary;
+  if (!summary) {
+    return `${sequence}${source}${data.event || "event"} ${JSON.stringify(data.phase ?? "").slice(0, 120)}`;
+  }
+
+  const picks = (summary.myTeam || [])
+    .map((member) => member.championId || member.championPickIntent || "?")
+    .join(",");
+  const seconds =
+    typeof summary.timeLeftMs === "number" ? `${Math.round(summary.timeLeftMs / 1000)}s` : "?";
+  return `${sequence}${source}${summary.phase || "ChampSelect"} · ${seconds} left · my team ${picks}`;
+}
+
 function setStatus(text, kind) {
   statusEl.textContent = text;
   statusEl.className = kind || "";
@@ -44,7 +70,7 @@ port.onMessage.addListener((frame) => {
   }
 
   if (event === "STREAM") {
-    log(`${adapter} stream: ${JSON.stringify(data).slice(0, 240)}`);
+    log(`${adapter} stream: ${describeStream(adapter, data || {})}`);
   }
 });
 

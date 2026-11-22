@@ -19,7 +19,8 @@
     Target folder. Defaults to %LOCALAPPDATA%\RustSentinelBridge.
 
 .PARAMETER Uninstall
-    Removes the registry keys and the install folder.
+    Removes the registry keys and the install folder. When uninstall.ps1 ships next to
+    this script it is used instead, because it also cleans legacy layouts.
 
 .PARAMETER DryRun
     Copies the files and writes the manifest, but skips the HKCU registration (useful to
@@ -170,6 +171,17 @@ $installDir = Resolve-InstallDir -Requested $InstallDir
 if ($Uninstall) {
     Write-Host ""
     Write-Host "Rust Sentinel Bridge - uninstall" -ForegroundColor Cyan
+
+    # The standalone uninstaller knows every legacy layout and browser key, so
+    # it is preferred whenever it ships next to this script.
+    if ($PSScriptRoot) {
+        $standalone = Join-Path $PSScriptRoot "uninstall.ps1"
+        if (Test-Path -LiteralPath $standalone -PathType Leaf) {
+            & $standalone -InstallDir $installDir
+            exit $LASTEXITCODE
+        }
+    }
+
     Remove-Host -Directory $installDir
     exit 0
 }

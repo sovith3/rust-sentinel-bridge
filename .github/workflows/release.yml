@@ -56,7 +56,7 @@ jobs:
 
           # Portable drop-in folder: the exe, the one-shot installer, the docs.
           Copy-Item -LiteralPath $exe -Destination "$dist/rust-sentinel-bridge.exe"
-          Copy-Item -LiteralPath "README.md", "LICENSE", "NOTICE", "install.ps1" -Destination $dist
+          Copy-Item -LiteralPath "README.md", "LICENSE", "NOTICE", "install.ps1", "uninstall.ps1" -Destination $dist
           Copy-Item -LiteralPath "docs/PROTOCOL.md" -Destination "$dist/PROTOCOL.md"
 
           # Portable bundle (exe + install.ps1 + docs) and the unpacked extension.
@@ -73,7 +73,7 @@ jobs:
             throw "$extZip does not contain manifest.json at its root"
           }
           $hostEntries = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $hostZip)).Entries.FullName
-          foreach ($required in @("rust-sentinel-bridge.exe", "install.ps1")) {
+          foreach ($required in @("rust-sentinel-bridge.exe", "install.ps1", "uninstall.ps1")) {
             if ($hostEntries -notcontains $required) {
               throw "$hostZip is missing $required"
             }
@@ -98,6 +98,21 @@ jobs:
             Zero-port bridge between any HTTPS page and Windows: local Ollama, file
             scanning, hardware telemetry and the League of Legends LCU.
 
+            ### What changed in 1.0.1
+
+            * **Champion select logs no longer go silent.** The LCU subscription used to
+              die for good when the lockfile was missing, so subscribing before the
+              client started (or before queueing up) left the event log empty. It now
+              keeps retrying, streams `OnJsonApiEvent_lol-gameflow_v1_gameflow-phase`
+              too, and falls back to HTTPS polling when the loopback socket is blocked.
+            * Duplicate `ws` + `poll` frames are deduplicated, so one change in the client
+              is one log line with one sequence number.
+            * The extension replays streaming requests after a service-worker or native
+              host restart, and the demo page subscribes to champion select when you open
+              the *League LCU* tab.
+            * New `uninstall.ps1`: removes any version of the bridge, current or legacy,
+              from every Chromium browser, no admin rights required.
+
             ### Install in three steps
 
             1. Download `rust-sentinel-extension.zip`, extract it, then open
@@ -114,6 +129,14 @@ jobs:
             3. Reload the extension and open the live demo:
                <https://sovith3.github.io/rust-sentinel-bridge/>
 
+            ### Uninstall any version
+
+            ```powershell
+            powershell -ExecutionPolicy Bypass -File .\uninstall.ps1
+            ```
+
+            Add `-DryRun` to see what would be removed, `-KeepLog` to keep `bridge.log`.
+
             Verify the download with:
 
             ```powershell
@@ -127,4 +150,5 @@ jobs:
             rust-sentinel-bridge-*-win64.zip
             rust-sentinel-extension.zip
             install.ps1
+            uninstall.ps1
             SHA256SUMS.txt
