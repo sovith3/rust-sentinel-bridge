@@ -98,7 +98,7 @@ jobs:
             Zero-port bridge between any HTTPS page and Windows: local Ollama, file
             scanning, hardware telemetry and the League of Legends LCU.
 
-            ### What changed in 1.0.1
+            ### What changed
 
             * **Champion select logs no longer go silent.** The LCU subscription used to
               die for good when the lockfile was missing, so subscribing before the
@@ -106,7 +106,8 @@ jobs:
               keeps retrying, streams `OnJsonApiEvent_lol-gameflow_v1_gameflow-phase`
               too, and falls back to HTTPS polling when the loopback socket is blocked.
             * Duplicate `ws` + `poll` frames are deduplicated, so one change in the client
-              is one log line with one sequence number.
+              is one log line with one sequence number. Repeated identical socket failures
+              are reported once instead of every 3 s, so the log stays readable.
             * The extension replays streaming requests after a service-worker or native
               host restart, and the demo page subscribes to champion select when you open
               the *League LCU* tab.

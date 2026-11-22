@@ -667,6 +667,9 @@ impl LolLcu {
 /// queue up minutes after the page subscribed.
 async fn ws_loop(out: Emitter, state: Arc<StreamState>) {
     let mut notice = String::new();
+    // Repeating the same "failed, retrying" line every 3 s would bury the real
+    // events in the log, so a known failure is announced exactly once.
+    let mut last_failure = String::new();
 
     loop {
         let lockfile = match Lockfile::read() {
@@ -688,23 +691,33 @@ async fn ws_loop(out: Emitter, state: Arc<StreamState>) {
         };
         notice.clear();
 
-        out.status(
-            "opening LCU event socket",
-            json!({ "url": lockfile.ws_url(), "events": SUBSCRIBED_EVENTS }),
-        );
+        if last_failure.is_empty() {
+            out.status(
+                "opening LCU event socket",
+                json!({ "url": lockfile.ws_url(), "events": SUBSCRIBED_EVENTS }),
+            );
+        }
 
         match stream_events(&lockfile, &out, &state).await {
-            Ok(()) => out.status(
-                "LCU closed the event socket",
-                json!({ "retryInMs": RECONNECT_DELAY.as_millis() as u64 }),
-            ),
-            Err(reason) => out.status(
-                "LCU event socket failed, retrying",
-                json!({
-                    "reason": reason,
-                    "retryInMs": RECONNECT_DELAY.as_millis() as u64
-                }),
-            ),
+            Ok(()) => {
+                last_failure.clear();
+                out.status(
+                    "LCU closed the event socket",
+                    json!({ "retryInMs": RECONNECT_DELAY.as_millis() as u64 }),
+                );
+            }
+            Err(reason) => {
+                if reason != last_failure {
+                    last_failure = reason.clone();
+                    out.status(
+                        "LCU event socket failed, retrying",
+                        json!({
+                            "reason": reason,
+                            "retryInMs": RECONNECT_DELAY.as_millis() as u64
+                        }),
+                    );
+                }
+            }
         }
 
         tokio::time::sleep(RECONNECT_DELAY).await;
