@@ -67,8 +67,17 @@ function Invoke-Git {
         Write-Step ("git " + ($Arguments -join " "))
         return ""
     }
-    $output = & git @Arguments 2>&1
-    if ($LASTEXITCODE -ne 0) {
+    # git writes progress to stderr; with $ErrorActionPreference = "Stop" PowerShell
+    # would turn that into a terminating error, so it is relaxed around the call.
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = & git @Arguments 2>&1
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previous
+    }
+    if ($code -ne 0) {
         throw ("git " + ($Arguments -join " ") + " failed:`n" + ($output -join "`n"))
     }
     return ($output -join "`n")
@@ -80,8 +89,15 @@ function Invoke-GitSoft {
         Write-Step ("git " + ($Arguments -join " "))
         return ""
     }
-    $output = & git @Arguments 2>&1
-    if ($LASTEXITCODE -ne 0) {
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = & git @Arguments 2>&1
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previous
+    }
+    if ($code -ne 0) {
         return ""
     }
     return ($output -join "`n")
